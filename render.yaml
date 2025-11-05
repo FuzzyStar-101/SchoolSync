@@ -18,4 +18,3 @@ databases:
   - name: schoolsync-db
     databaseName: schoolsync
 
-    plan: free
