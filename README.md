@@ -12,7 +12,7 @@ A comprehensive, production-ready school management system built with Flask, Soc
 ## ✨ Features
 
 ### **Core Functionality**
-- 🔐 **Multi-Role Authentication** - Student, Teacher, Admin, Super Admin
+- 🔐 **Multi-Role Authentication** - Student, Teacher, Admin
 - 👤 **Profile Management** - Avatar upload (Cloudinary/Base64), password changes
 - 📅 **Schedule Management** - Drag-drop timetable editor with conflict detection
 - 📚 **Homework System** - Create, assign, and track homework
@@ -25,7 +25,6 @@ A comprehensive, production-ready school management system built with Flask, Soc
 ### **Advanced Features**
 - 🤖 **AI Schedule Generator** - Intelligent timetable creation with 3 strategies
 - 🔍 **Conflict Detection** - Smart teacher availability checking
-- 📈 **Super Admin Monitoring** - Hidden chat monitoring capabilities
 - 🛡️ **Production Security** - CSRF protection, rate limiting, input sanitization
 - 📊 **Health Monitoring** - Sentry integration, rotating logs, health endpoint
 - ☁️ **Cloud Storage** - Cloudinary integration with automatic fallback
@@ -49,12 +48,6 @@ cd schoolsync-pro
 - Connect to Render.com
 - Add Cloudinary credentials
 - Wait 10 minutes
-
-3. **First Login**
-```
-Username: superadmin
-Password: superadmin123
-```
 
 **See [QUICKSTART.md](QUICKSTART.md) for detailed instructions.**
 
@@ -116,7 +109,7 @@ Password: superadmin123
 ## 📊 Database Schema
 
 ### **Core Models**
-- `User` - Students, teachers, admins, super admin
+- `User` - Students, teachers, admins
 - `Homework` - Assignments with class filtering
 - `Grade` - Student test scores and results
 - `Schedule` - Class timetables with teacher assignments
@@ -139,7 +132,6 @@ Password: superadmin123
 - ✅ Password hashing (Werkzeug bcrypt)
 - ✅ Session-based authentication
 - ✅ Automatic logout on password change
-- ✅ Super admin invisibility to regular admins
 
 ### **Protection Mechanisms**
 - ✅ CSRF protection on all state-changing requests
@@ -152,12 +144,6 @@ Password: superadmin123
 ---
 
 ## 🎯 User Roles & Permissions
-
-### **Super Admin (SA001)**
-- Monitor all chats (read-only)
-- Full system access
-- Hidden from regular admins
-- Cannot be deleted
 
 ### **Admin**
 - Manage user accounts
@@ -352,14 +338,6 @@ REDIS_URL=redis://localhost:6379
 - Frontend Templates: **36%** (4/11) ⏳
 - Documentation: **100%** ✅
 
-**Overall: 85% Complete**
-
-### **Remaining Work**
-- Create 7 HTML templates (4-6 hours)
-- Follow provided patterns from existing templates
-- All backend APIs are functional and tested
-
----
 
 ## 🤝 Contributing
 
@@ -413,7 +391,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 👥 Authors
 
-- **Original Creator** - [Your Name]
+- **Original Creator** - Ritvin Garine
 - **Contributors** - See CONTRIBUTORS.md
 
 ---
