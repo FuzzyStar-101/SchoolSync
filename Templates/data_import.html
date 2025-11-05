@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+
+{% block title %}Data Import - SchoolSync Pro{% endblock %}
+{% block page_title %}Data Import{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2><i class="fas fa-file-upload"></i> Import Data</h2>
+        <p style="color: var(--secondary); margin-top: 5px; font-size: 14px;">
+            Upload CSV, Excel, or JSON files to bulk import students, teachers, or schedules
+        </p>
+    </div>
+    
+    <div style="padding: 25px;">
+        <!-- File Upload Area -->
+        <div id="dropZone" style="border: 3px dashed var(--primary); border-radius: 15px; padding: 60px; text-align: center; background: var(--light); cursor: pointer; transition: all 0.3s; margin-bottom: 25px;"
+             ondragover="event.preventDefault(); this.style.borderColor='var(--success)'; this.style.background='#d1fae5';"
+             ondragleave="this.style.borderColor='var(--primary)'; this.style.background='var(--light)';"
+             ondrop="handleDrop(event)"
+             onclick="document.getElementById('fileInput').click()">
+            <i class="fas fa-cloud-upload-alt" style="font-size: 64px; color: var(--primary); margin-bottom: 20px;"></i>
+            <h3 style="color: var(--dark); margin-bottom: 10px;">Drag & Drop File Here</h3>
+            <p style="color: var(--secondary);">or click to browse</p>
+            <p style="color: var(--secondary); font-size: 13px; margin-top: 10px;">Supports: CSV, XLSX, XLS, JSON (Max 16MB)</p>
+        </div>
+        
+        <input type="file" id="fileInput" accept=".csv,.xlsx,.xls,.json" style="display: none;" onchange="handleFileSelect(event)">
+        
+        <!-- Data Type Selection -->
+        <div class="form-group">
+            <label>Data Type</label>
+            <select class="form-control" id="dataType">
+                <option value="auto">Auto-detect</option>
+                <option value="students">Students</option>
+                <option value="teachers">Teachers</option>
+                <option value="teacher_schedule">Teacher Schedule (with periods)</option>
+            </select>
+            <small style="color: var(--secondary); margin-top: 5px; display: block;">
+                Teacher Schedule format: Teacher_Name, Subject, Class, Periods_Per_Week
+            </small>
+        </div>
+        
+        <!-- Selected File Display -->
+        <div id="selectedFile" style="display: none; padding: 20px; background: var(--light); border-radius: 10px; margin-bottom: 25px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <i class="fas fa-file-alt" style="font-size: 32px; color: var(--primary);"></i>
+                    <div>
+                        <strong id="fileName" style="color: var(--dark);"></strong>
+                        <p id="fileSize" style="color: var(--secondary); font-size: 13px; margin-top: 5px;"></p>
+                    </div>
+                </div>
+                <button class="btn btn-danger" onclick="clearFile()">
+                    <i class="fas fa-times"></i> Clear
+                </button>
+            </div>
+        </div>
+        
+        <button id="uploadBtn" class="btn btn-primary" style="width: 100%; display: none;" onclick="uploadFile()">
+            <i class="fas fa-upload"></i> Upload and Process
+        </button>
+        
+        <!-- Import Results -->
+        <div id="importResults" style="display: none; margin-top: 30px;">
+            <h3 style="margin-bottom: 20px; color: var(--dark);">Import Results</h3>
+            
+            <!-- Summary -->
+            <div id="importSummary" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 25px;">
+                <div style="background: #d1fae5; padding: 20px; border-radius: 10px; text-align: center;">
+                    <div style="font-size: 36px; font-weight: 700; color: #065f46;" id="successCount">0</div>
+                    <div style="color: #065f46; font-weight: 600;">Success</div>
+                </div>
+                <div style="background: #fee2e2; padding: 20px; border-radius: 10px; text-align: center;">
+                    <div style="font-size: 36px; font-weight: 700; color: #991b1b;" id="errorCount">0</div>
+                    <div style="color: #991b1b; font-weight: 600;">Errors</div>
+                </div>
+                <div style="background: #dbeafe; padding: 20px; border-radius: 10px; text-align: center;">
+                    <div style="font-size: 36px; font-weight: 700; color: #1e40af;" id="totalCount">0</div>
+                    <div style="color: #1e40af; font-weight: 600;">Total Rows</div>
+                </div>
+            </div>
+            
+            <!-- Feedback Chat -->
+            <div style="background: white; border: 2px solid var(--light); border-radius: 15px; padding: 20px; max-height: 400px; overflow-y: auto;" id="feedbackChat"></div>
+        </div>
+    </div>
+</div>
+
+<style>
+    #dropZone:hover {
+        border-color: var(--success);
+        background: #ecfdf5;
+    }
+    
+    .feedback-message {
+        padding: 12px 15px;
+        border-radius: 10px;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        animation: slideIn 0.3s;
+    }
+    
+    @keyframes slideIn {
+        from { transform: translateX(-20px); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    
+    .feedback-success {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    
+    .feedback-error {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+    
+    .feedback-info {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+    
+    .feedback-warning {
+        background: #fef3c7;
+        color: #92400e;
+    }
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let selectedFileData = null;
+    
+    function handleDrop(event) {
+        event.preventDefault();
+        const dropZone = document.getElementById('dropZone');
+        dropZone.style.borderColor = 'var(--primary)';
+        dropZone.style.background = 'var(--light)';
+        
+        const file = event.dataTransfer.files[0];
+        if (file) {
+            processFile(file);
+        }
+    }
+    
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        if (file) {
+            processFile(file);
+        }
+    }
+    
+    function processFile(file) {
+        // Check file size (16MB max)
+        if (file.size > 16 * 1024 * 1024) {
+            alert('File size exceeds 16MB limit');
+            return;
+        }
+        
+        // Check file type
+        const validTypes = ['.csv', '.xlsx', '.xls', '.json'];
+        const fileExt = '.' + file.name.split('.').pop().toLowerCase();
+        if (!validTypes.includes(fileExt)) {
+            alert('Invalid file type. Please upload CSV, Excel, or JSON files.');
+            return;
+        }
+        
+        selectedFileData = file;
+        
+        // Display file info
+        document.getElementById('fileName').textContent = file.name;
+        document.getElementById('fileSize').textContent = formatFileSize(file.size);
+        document.getElementById('selectedFile').style.display = 'block';
+        document.getElementById('uploadBtn').style.display = 'block';
+    }
+    
+    function formatFileSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+    }
+    
+    function clearFile() {
+        selectedFileData = null;
+        document.getElementById('fileInput').value = '';
+        document.getElementById('selectedFile').style.display = 'none';
+        document.getElementById('uploadBtn').style.display = 'none';
+        document.getElementById('importResults').style.display = 'none';
+    }
+    
+    async function uploadFile() {
+        if (!selectedFileData) {
+            alert('Please select a file first');
+            return;
+        }
+        
+        const dataType = document.getElementById('dataType').value;
+        const formData = new FormData();
+        formData.append('file', selectedFileData);
+        formData.append('dataType', dataType);
+        
+        const uploadBtn = document.getElementById('uploadBtn');
+        uploadBtn.disabled = true;
+        uploadBtn.innerHTML = '<span class="spinner"></span> Processing...';
+        
+        try {
+            const response = await fetchWithCSRF('/api/admin/upload', {
+                method: 'POST',
+                body: formData,
+                headers: {} // Remove Content-Type to let browser set it with boundary
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                displayResults(result);
+            } else {
+                const error = await response.json();
+                alert(error.error || 'Upload failed');
+            }
+        } catch (error) {
+            console.error('Upload error:', error);
+            alert('Upload failed');
+        } finally {
+            uploadBtn.disabled = false;
+            uploadBtn.innerHTML = '<i class="fas fa-upload"></i> Upload and Process';
+        }
+    }
+    
+    function displayResults(result) {
+        document.getElementById('importResults').style.display = 'block';
+        
+        // Update summary
+        document.getElementById('successCount').textContent = result.summary.success;
+        document.getElementById('errorCount').textContent = result.summary.errors;
+        document.getElementById('totalCount').textContent = result.summary.total;
+        
+        // Display feedback messages
+        const feedbackChat = document.getElementById('feedbackChat');
+        feedbackChat.innerHTML = result.results.map(item => {
+            const statusClass = item.status === 'success' ? 'feedback-success' :
+                               item.status === 'error' ? 'feedback-error' :
+                               item.status === 'warning' ? 'feedback-warning' : 'feedback-info';
+            
+            const icon = item.status === 'success' ? 'fa-check-circle' :
+                        item.status === 'error' ? 'fa-times-circle' :
+                        item.status === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle';
+            
+            return `
+                <div class="feedback-message ${statusClass}">
+                    <i class="fas ${icon}"></i>
+                    <div>
+                        <strong>Row ${item.row}:</strong> ${item.message}
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        // Scroll to results
+        document.getElementById('importResults').scrollIntoView({ behavior: 'smooth' });
+    }
+</script>
+{% endblock %}

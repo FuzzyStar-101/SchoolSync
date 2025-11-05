@@ -1,0 +1,312 @@
+{% extends "base.html" %}
+
+{% block title %}Schedule - SchoolSync Pro{% endblock %}
+{% block page_title %}Today's Schedule{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h2><i class="fas fa-calendar-day"></i> <span id="todayDate"></span></h2>
+            <p style="color: var(--secondary); margin-top: 5px; font-size: 14px;">Your schedule for today</p>
+        </div>
+        {% if session.role == 'student' %}
+        <a href="/calendar" class="btn btn-primary">
+            <i class="fas fa-calendar-week"></i> View Full Week
+        </a>
+        {% endif %}
+    </div>
+    
+    <div style="padding: 25px;">
+        <div id="scheduleLoading" style="text-align: center; padding: 60px;">
+            <div class="spinner"></div>
+            <p style="color: var(--secondary); margin-top: 15px;">Loading schedule...</p>
+        </div>
+
+        <div id="scheduleContainer" style="display: none;"></div>
+
+        <div id="noSchedule" style="display: none; text-align: center; padding: 60px;">
+            <i class="fas fa-calendar-times" style="font-size: 64px; color: var(--secondary); opacity: 0.3; margin-bottom: 20px;"></i>
+            <h3 style="color: var(--secondary);">No Schedule Available</h3>
+            <p style="color: var(--secondary); margin-top: 10px;">
+                {% if session.role in ['admin', 'superadmin'] %}
+                    Go to <a href="/timetable-editor" style="color: var(--primary);">Timetable Editor</a> to create a schedule.
+                {% else %}
+                    Your schedule hasn't been created yet. Please contact your administrator.
+                {% endif %}
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Current Time Indicator -->
+<div id="currentTimeCard" style="position: fixed; bottom: 30px; right: 30px; background: var(--primary); color: white; padding: 15px 25px; border-radius: 50px; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3); display: none; z-index: 100;">
+    <i class="fas fa-clock"></i>
+    <span id="currentTime" style="font-weight: 600; margin-left: 8px;"></span>
+</div>
+
+<style>
+    .period-card {
+        background: white;
+        padding: 25px;
+        border-radius: 15px;
+        margin-bottom: 15px;
+        border-left: 5px solid var(--light);
+        transition: all 0.3s;
+        cursor: pointer;
+    }
+
+    .period-card:hover {
+        transform: translateX(5px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+
+    .period-card.current {
+        background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
+        border-left-color: var(--primary);
+        box-shadow: 0 4px 20px rgba(59, 130, 246, 0.2);
+    }
+
+    .period-card.free {
+        opacity: 0.6;
+        border-left-color: var(--secondary);
+    }
+
+    .period-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+
+    .period-number {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--dark);
+    }
+
+    .period-time {
+        color: var(--secondary);
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .period-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .subject-info {
+        flex: 1;
+    }
+
+    .subject-name {
+        font-size: 20px;
+        font-weight: 600;
+        color: var(--dark);
+        margin-bottom: 5px;
+    }
+
+    .teacher-name {
+        color: var(--secondary);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+    }
+
+    .current-badge {
+        background: var(--primary);
+        color: white;
+        padding: 6px 15px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% {
+            box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+        }
+        50% {
+            box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
+        }
+    }
+
+    .free-period-text {
+        color: var(--secondary);
+        font-style: italic;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 16px;
+    }
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const today = new Date();
+    const dayName = days[today.getDay()];
+    
+    // Period times
+    const periodTimes = {
+        1: { start: '08:00', end: '08:45' },
+        2: { start: '08:45', end: '09:30' },
+        3: { start: '09:30', end: '10:15' },
+        4: { start: '10:30', end: '11:15' },
+        5: { start: '11:15', end: '12:00' },
+        6: { start: '12:00', end: '12:45' },
+        7: { start: '12:45', end: '13:30' },
+        8: { start: '13:30', end: '14:15' }
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+        updateDateTime();
+        setInterval(updateDateTime, 1000);
+        loadSchedule();
+    });
+
+    function updateDateTime() {
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+        
+        const timeStr = now.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+
+        document.getElementById('todayDate').textContent = dateStr;
+        
+        const timeCard = document.getElementById('currentTimeCard');
+        const currentTime = document.getElementById('currentTime');
+        if (timeCard && currentTime) {
+            currentTime.textContent = timeStr;
+            if (isSchoolHours()) {
+                timeCard.style.display = 'flex';
+            }
+        }
+    }
+
+    function isSchoolHours() {
+        const now = new Date();
+        const hours = now.getHours();
+        return hours >= 8 && hours < 15; // 8 AM to 3 PM
+    }
+
+    async function loadSchedule() {
+        try {
+            const response = await fetch('/api/schedule');
+            const schedule = await response.json();
+            
+            const todaySchedule = schedule[dayName] || {};
+            const container = document.getElementById('scheduleContainer');
+            
+            // Check if schedule has any periods
+            const hasPeriods = Object.values(todaySchedule).some(entry => entry.subject);
+            
+            if (!hasPeriods) {
+                document.getElementById('scheduleLoading').style.display = 'none';
+                document.getElementById('noSchedule').style.display = 'block';
+                return;
+            }
+
+            let html = '';
+            
+            for (let period = 1; period <= 8; period++) {
+                const entry = todaySchedule[period] || { subject: '', teacher: '' };
+                const isCurrentPeriod = isCurrentTime(period);
+                const isFree = !entry.subject;
+                
+                html += `
+                    <div class="period-card ${isCurrentPeriod ? 'current' : ''} ${isFree ? 'free' : ''}">
+                        <div class="period-header">
+                            <div>
+                                <div class="period-number">Period ${period}</div>
+                                <div class="period-time">
+                                    <i class="fas fa-clock"></i>
+                                    ${periodTimes[period].start} - ${periodTimes[period].end}
+                                </div>
+                            </div>
+                            ${isCurrentPeriod ? '<span class="current-badge"><i class="fas fa-circle"></i> Now</span>' : ''}
+                        </div>
+                        <div class="period-content">
+                `;
+                
+                if (entry.subject) {
+                    html += `
+                        <div class="subject-info">
+                            <div class="subject-name">${entry.subject}</div>
+                            <div class="teacher-name">
+                                <i class="fas fa-chalkboard-teacher"></i>
+                                ${entry.teacher || 'No teacher assigned'}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <div class="free-period-text">
+                            <i class="fas fa-mug-hot"></i>
+                            Free Period
+                        </div>
+                    `;
+                }
+                
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = html;
+            document.getElementById('scheduleLoading').style.display = 'none';
+            container.style.display = 'block';
+
+        } catch (error) {
+            console.error('Failed to load schedule:', error);
+            document.getElementById('scheduleLoading').innerHTML = `
+                <div style="text-align: center; padding: 60px;">
+                    <i class="fas fa-exclamation-circle" style="font-size: 48px; color: var(--danger); margin-bottom: 15px;"></i>
+                    <p style="color: var(--danger); font-weight: 600;">Failed to load schedule</p>
+                    <button class="btn btn-primary" onclick="loadSchedule()" style="margin-top: 15px;">
+                        <i class="fas fa-sync"></i> Retry
+                    </button>
+                </div>
+            `;
+        }
+    }
+
+    function isCurrentTime(period) {
+        if (!isSchoolHours()) return false;
+        
+        const now = new Date();
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+        const currentTime = currentHour * 60 + currentMinute;
+        
+        const times = periodTimes[period];
+        const [startHour, startMinute] = times.start.split(':').map(Number);
+        const [endHour, endMinute] = times.end.split(':').map(Number);
+        
+        const startTime = startHour * 60 + startMinute;
+        const endTime = endHour * 60 + endMinute;
+        
+        return currentTime >= startTime && currentTime < endTime;
+    }
+</script>
+{% endblock %}

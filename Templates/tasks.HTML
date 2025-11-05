@@ -1,0 +1,478 @@
+{% extends "base.html" %}
+
+{% block title %}Tasks - SchoolSync Pro{% endblock %}
+{% block page_title %}Task Manager{% endblock %}
+
+{% block content %}
+<div class="card" style="height: calc(100vh - 180px);">
+    <div style="display: flex; height: 100%;">
+        <!-- Left Sidebar - Task Lists -->
+        <div style="width: 300px; border-right: 2px solid var(--light); padding: 20px; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="color: var(--dark);">My Lists</h3>
+                <button class="btn btn-primary" style="padding: 8px 15px; font-size: 13px;" onclick="createList()">
+                    <i class="fas fa-plus"></i> New
+                </button>
+            </div>
+
+            <div id="taskLists"></div>
+        </div>
+
+        <!-- Right Panel - Tasks -->
+        <div style="flex: 1; display: flex; flex-direction: column; padding: 20px;">
+            <div id="noListSelected" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--secondary);">
+                <i class="fas fa-tasks" style="font-size: 64px; margin-bottom: 20px; opacity: 0.3;"></i>
+                <h3>Select a list to view tasks</h3>
+                <p>Or create a new list to get started</p>
+            </div>
+
+            <div id="taskContainer" style="display: none; flex: 1; overflow-y: auto;">
+                <div style="margin-bottom: 25px;">
+                    <h2 id="currentListName" style="color: var(--dark); font-size: 28px; margin-bottom: 5px;"></h2>
+                    <p id="taskProgress" style="color: var(--secondary); font-size: 14px;"></p>
+                </div>
+
+                <div id="tasksList"></div>
+
+                <div style="margin-top: 20px;">
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="newTaskInput" class="form-control" placeholder="Add a task..." 
+                               style="flex: 1;" onkeypress="if(event.key==='Enter') addTask()">
+                        <button class="btn btn-primary" onclick="addTask()">
+                            <i class="fas fa-plus"></i> Add
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Task Details Modal -->
+<div class="modal" id="taskModal">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h2>Task Details</h2>
+            <button class="close-modal" onclick="closeTaskModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>Task</label>
+                <input type="text" class="form-control" id="taskText" placeholder="Task description">
+            </div>
+            <div class="form-group">
+                <label>Notes (Optional)</label>
+                <textarea class="form-control" id="taskNotes" rows="4" placeholder="Add additional notes..."></textarea>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-primary" style="flex: 1;" onclick="saveTaskDetails()">
+                    <i class="fas fa-save"></i> Save
+                </button>
+                <button class="btn btn-danger" onclick="deleteTask()">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .task-list-item {
+        padding: 15px;
+        margin-bottom: 10px;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.3s;
+        border-left: 4px solid;
+        background: var(--light);
+    }
+
+    .task-list-item:hover {
+        background: #e2e8f0;
+        transform: translateX(5px);
+    }
+
+    .task-list-item.active {
+        background: white;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .task-list-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 5px;
+    }
+
+    .task-list-name {
+        font-weight: 600;
+        color: var(--dark);
+        font-size: 16px;
+    }
+
+    .task-list-count {
+        font-size: 12px;
+        color: var(--secondary);
+    }
+
+    .delete-list-btn {
+        background: none;
+        border: none;
+        color: var(--danger);
+        cursor: pointer;
+        padding: 5px;
+        border-radius: 5px;
+        opacity: 0;
+        transition: all 0.3s;
+    }
+
+    .task-list-item:hover .delete-list-btn {
+        opacity: 1;
+    }
+
+    .delete-list-btn:hover {
+        background: var(--danger);
+        color: white;
+    }
+
+    .task-item {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 15px;
+        background: white;
+        border-radius: 10px;
+        margin-bottom: 10px;
+        transition: all 0.3s;
+        cursor: pointer;
+        border: 2px solid transparent;
+    }
+
+    .task-item:hover {
+        border-color: var(--primary);
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+    }
+
+    .task-checkbox {
+        width: 24px;
+        height: 24px;
+        cursor: pointer;
+        accent-color: var(--success);
+    }
+
+    .task-text {
+        flex: 1;
+        color: var(--dark);
+        font-size: 15px;
+    }
+
+    .task-text.completed {
+        text-decoration: line-through;
+        color: var(--secondary);
+    }
+
+    .task-notes-indicator {
+        color: var(--secondary);
+        font-size: 12px;
+    }
+
+    .color-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 8px;
+    }
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let taskLists = [];
+    let selectedListId = null;
+    let selectedTaskId = null;
+
+    const COLORS = {
+        'blue': '#3b82f6',
+        'green': '#10b981',
+        'red': '#ef4444',
+        'yellow': '#f59e0b',
+        'purple': '#8b5cf6',
+        'pink': '#ec4899',
+        'indigo': '#6366f1',
+        'teal': '#14b8a6'
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadTaskLists();
+    });
+
+    async function loadTaskLists() {
+        try {
+            const response = await fetch('/api/task-lists');
+            taskLists = await response.json();
+            renderTaskLists();
+        } catch (error) {
+            console.error('Failed to load task lists:', error);
+        }
+    }
+
+    function renderTaskLists() {
+        const container = document.getElementById('taskLists');
+        
+        if (taskLists.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 20px; color: var(--secondary);">
+                    <i class="fas fa-inbox" style="font-size: 48px; opacity: 0.3; margin-bottom: 10px;"></i>
+                    <p>No lists yet. Create one to get started!</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = taskLists.map(list => {
+            const completedCount = list.tasks.filter(t => t.completed).length;
+            const totalCount = list.tasks.length;
+            const color = COLORS[list.color] || COLORS.blue;
+
+            return `
+                <div class="task-list-item ${selectedListId === list.id ? 'active' : ''}" 
+                     style="border-left-color: ${color};"
+                     onclick="selectList(${list.id})">
+                    <div class="task-list-header">
+                        <div style="display: flex; align-items: center;">
+                            <span class="color-dot" style="background: ${color};"></span>
+                            <span class="task-list-name" ondblclick="event.stopPropagation(); renameList(${list.id})">${list.name}</span>
+                        </div>
+                        <button class="delete-list-btn" onclick="event.stopPropagation(); deleteList(${list.id})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                    <div class="task-list-count">${completedCount}/${totalCount} completed</div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function selectList(listId) {
+        selectedListId = listId;
+        const list = taskLists.find(l => l.id === listId);
+        
+        if (!list) return;
+
+        document.getElementById('noListSelected').style.display = 'none';
+        document.getElementById('taskContainer').style.display = 'flex';
+        document.getElementById('currentListName').textContent = list.name;
+        
+        const completed = list.tasks.filter(t => t.completed).length;
+        const total = list.tasks.length;
+        document.getElementById('taskProgress').textContent = `${completed} of ${total} tasks completed`;
+
+        renderTasks(list.tasks);
+        renderTaskLists(); // Update active state
+    }
+
+    function renderTasks(tasks) {
+        const container = document.getElementById('tasksList');
+        
+        if (tasks.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: var(--secondary);">
+                    <i class="fas fa-check-circle" style="font-size: 48px; opacity: 0.3; margin-bottom: 10px;"></i>
+                    <p>No tasks yet. Add one below!</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = tasks.map(task => `
+            <div class="task-item" onclick="openTaskModal(${task.id})">
+                <input type="checkbox" class="task-checkbox" ${task.completed ? 'checked' : ''} 
+                       onclick="event.stopPropagation(); toggleTask(${task.id})" >
+                <div class="task-text ${task.completed ? 'completed' : ''}">${task.text}</div>
+                ${task.notes ? '<i class="fas fa-sticky-note task-notes-indicator"></i>' : ''}
+            </div>
+        `).join('');
+    }
+
+    async function createList() {
+        const name = prompt('Enter list name:');
+        if (!name) return;
+
+        const colors = Object.keys(COLORS);
+        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+
+        try {
+            const response = await fetchWithCSRF('/api/task-lists', {
+                method: 'POST',
+                body: JSON.stringify({ name, color: randomColor })
+            });
+
+            if (response.ok) {
+                await loadTaskLists();
+                const newList = taskLists[taskLists.length - 1];
+                selectList(newList.id);
+            }
+        } catch (error) {
+            console.error('Failed to create list:', error);
+            alert('Failed to create list');
+        }
+    }
+
+    async function renameList(listId) {
+        const list = taskLists.find(l => l.id === listId);
+        const newName = prompt('Rename list:', list.name);
+        
+        if (!newName || newName === list.name) return;
+
+        // Note: Add rename endpoint to backend if needed
+        // For now, just update locally
+        list.name = newName;
+        renderTaskLists();
+    }
+
+    async function deleteList(listId) {
+        if (!confirm('Delete this list and all its tasks?')) return;
+
+        try {
+            const response = await fetchWithCSRF(`/api/task-lists?id=${listId}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                if (selectedListId === listId) {
+                    selectedListId = null;
+                    document.getElementById('noListSelected').style.display = 'flex';
+                    document.getElementById('taskContainer').style.display = 'none';
+                }
+                await loadTaskLists();
+            }
+        } catch (error) {
+            console.error('Failed to delete list:', error);
+            alert('Failed to delete list');
+        }
+    }
+
+    async function addTask() {
+        const input = document.getElementById('newTaskInput');
+        const text = input.value.trim();
+
+        if (!text) return;
+
+        try {
+            const response = await fetchWithCSRF('/api/tasks', {
+                method: 'POST',
+                body: JSON.stringify({
+                    list_id: selectedListId,
+                    text: text
+                })
+            });
+
+            if (response.ok) {
+                input.value = '';
+                await loadTaskLists();
+                selectList(selectedListId);
+            }
+        } catch (error) {
+            console.error('Failed to add task:', error);
+            alert('Failed to add task');
+        }
+    }
+
+    async function toggleTask(taskId) {
+        const list = taskLists.find(l => l.id === selectedListId);
+        const task = list.tasks.find(t => t.id === taskId);
+        task.completed = !task.completed;
+
+        try {
+            await fetchWithCSRF('/api/tasks', {
+                method: 'PUT',
+                body: JSON.stringify({
+                    id: taskId,
+                    completed: task.completed
+                })
+            });
+
+            selectList(selectedListId);
+        } catch (error) {
+            console.error('Failed to toggle task:', error);
+            task.completed = !task.completed; // Revert on error
+        }
+    }
+
+    function openTaskModal(taskId) {
+        const list = taskLists.find(l => l.id === selectedListId);
+        const task = list.tasks.find(t => t.id === taskId);
+
+        selectedTaskId = taskId;
+        document.getElementById('taskText').value = task.text;
+        document.getElementById('taskNotes').value = task.notes || '';
+        document.getElementById('taskModal').classList.add('active');
+    }
+
+    function closeTaskModal() {
+        document.getElementById('taskModal').classList.remove('active');
+        selectedTaskId = null;
+    }
+
+    async function saveTaskDetails() {
+        const text = document.getElementById('taskText').value.trim();
+        const notes = document.getElementById('taskNotes').value.trim();
+
+        if (!text) {
+            alert('Task text is required');
+            return;
+        }
+
+        try {
+            const response = await fetchWithCSRF('/api/tasks', {
+                method: 'PUT',
+                body: JSON.stringify({
+                    id: selectedTaskId,
+                    text: text,
+                    notes: notes
+                })
+            });
+
+            if (response.ok) {
+                closeTaskModal();
+                await loadTaskLists();
+                selectList(selectedListId);
+            }
+        } catch (error) {
+            console.error('Failed to save task:', error);
+            alert('Failed to save task');
+        }
+    }
+
+    async function deleteTask() {
+        if (!confirm('Delete this task?')) return;
+
+        try {
+            const response = await fetchWithCSRF(`/api/tasks?id=${selectedTaskId}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                closeTaskModal();
+                await loadTaskLists();
+                selectList(selectedListId);
+            }
+        } catch (error) {
+            console.error('Failed to delete task:', error);
+            alert('Failed to delete task');
+        }
+    }
+
+    // Close modal on outside click
+    window.onclick = function(event) {
+        const modal = document.getElementById('taskModal');
+        if (event.target === modal) {
+            closeTaskModal();
+        }
+    }
+</script>
+{% endblock %}

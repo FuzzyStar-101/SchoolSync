@@ -1,0 +1,447 @@
+{% extends "base.html" %}
+
+{% block title %}Grades - SchoolSync Pro{% endblock %}
+{% block page_title %}
+    {% if session.role == 'student' %}My Grades{% else %}Grades Management{% endif %}
+{% endblock %}
+
+{% block content %}
+{% if session.role in ['teacher', 'admin', 'superadmin'] %}
+<!-- Add Grade Section -->
+<div class="card">
+    <div class="card-header">
+        <h2><i class="fas fa-plus-circle"></i> Add New Grade</h2>
+    </div>
+    <div style="padding: 25px;">
+        <form id="gradeForm" onsubmit="addGrade(event)">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div class="form-group">
+                    <label>Student ID <span style="color: var(--danger);">*</span></label>
+                    <input type="text" class="form-control" id="studentId" placeholder="e.g., S001" required>
+                </div>
+                <div class="form-group">
+                    <label>Subject <span style="color: var(--danger);">*</span></label>
+                    <input type="text" class="form-control" id="gradeSubject" required>
+                </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
+                <div class="form-group">
+                    <label>Test Type <span style="color: var(--danger);">*</span></label>
+                    <select class="form-control" id="testType" required>
+                        <option value="">Select type...</option>
+                        <option value="Quiz">Quiz</option>
+                        <option value="Unit Test">Unit Test</option>
+                        <option value="Mid Term">Mid Term</option>
+                        <option value="Final Exam">Final Exam</option>
+                        <option value="Assignment">Assignment</option>
+                        <option value="Project">Project</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Score <span style="color: var(--danger);">*</span></label>
+                    <input type="number" class="form-control" id="score" min="0" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label>Maximum Score <span style="color: var(--danger);">*</span></label>
+                    <input type="number" class="form-control" id="maxScore" min="1" step="0.01" required>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Date <span style="color: var(--danger);">*</span></label>
+                <input type="date" class="form-control" id="gradeDate" required>
+            </div>
+            
+            <button type="submit" class="btn btn-primary" style="width: 100%;">
+                <i class="fas fa-plus"></i> Add Grade
+            </button>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+<!-- Grades Display -->
+<div class="card">
+    <div class="card-header">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2><i class="fas fa-chart-line"></i> 
+                {% if session.role == 'student' %}
+                    My Performance
+                {% else %}
+                    Student Grades
+                {% endif %}
+            </h2>
+            {% if session.role in ['teacher', 'admin', 'superadmin'] %}
+            <input type="text" class="form-control" id="searchStudent" 
+                   placeholder="Enter Student ID..." 
+                   style="max-width: 300px;"
+                   onkeyup="if(event.key === 'Enter') loadGrades(this.value)">
+            {% endif %}
+        </div>
+    </div>
+    
+    <div style="padding: 25px;">
+        <div id="gradesLoading" style="text-align: center; padding: 60px;">
+            <div class="spinner"></div>
+            <p style="color: var(--secondary); margin-top: 15px;">Loading grades...</p>
+        </div>
+
+        <div id="gradesContainer" style="display: none;"></div>
+
+        <div id="noGrades" style="display: none; text-align: center; padding: 60px;">
+            <i class="fas fa-clipboard-list" style="font-size: 64px; color: var(--secondary); opacity: 0.3; margin-bottom: 20px;"></i>
+            <h3 style="color: var(--secondary);">No Grades Found</h3>
+            <p style="color: var(--secondary); margin-top: 10px;">
+                {% if session.role in ['teacher', 'admin', 'superadmin'] %}
+                    Enter a Student ID to view grades or add new grades using the form above.
+                {% else %}
+                    No grades have been recorded yet.
+                {% endif %}
+            </p>
+        </div>
+    </div>
+</div>
+
+<style>
+    .subject-card {
+        background: white;
+        border: 2px solid var(--light);
+        border-radius: 15px;
+        padding: 25px;
+        margin-bottom: 20px;
+        transition: all 0.3s;
+    }
+
+    .subject-card:hover {
+        border-color: var(--primary);
+        box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15);
+    }
+
+    .subject-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid var(--light);
+    }
+
+    .subject-name {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--dark);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .subject-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        background: linear-gradient(135deg, var(--primary) 0%, #8b5cf6 100%);
+        color: white;
+    }
+
+    .average-badge {
+        padding: 10px 20px;
+        border-radius: 25px;
+        font-size: 18px;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .average-badge.excellent {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .average-badge.good {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+
+    .average-badge.average {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .average-badge.poor {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .grades-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    .grades-table thead {
+        background: var(--light);
+    }
+
+    .grades-table th {
+        padding: 15px;
+        text-align: left;
+        font-weight: 600;
+        color: var(--dark);
+        border-bottom: 2px solid #e2e8f0;
+    }
+
+    .grades-table td {
+        padding: 15px;
+        border-bottom: 1px solid var(--light);
+    }
+
+    .grades-table tr:hover td {
+        background: #fafafa;
+    }
+
+    .percentage-cell {
+        font-weight: 700;
+        font-size: 16px;
+    }
+
+    .percentage-excellent {
+        color: #065f46;
+    }
+
+    .percentage-good {
+        color: #1e40af;
+    }
+
+    .percentage-average {
+        color: #92400e;
+    }
+
+    .percentage-poor {
+        color: #991b1b;
+    }
+
+    .score-display {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .progress-bar {
+        width: 60px;
+        height: 8px;
+        background: var(--light);
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    .progress-fill {
+        height: 100%;
+        transition: width 0.3s;
+    }
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const role = '{{ session.role }}';
+    const userId = '{{ session.user_id }}';
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const today = new Date().toISOString().split('T')[0];
+        const dateInput = document.getElementById('gradeDate');
+        if (dateInput) {
+            dateInput.value = today;
+        }
+        
+        if (role === 'student') {
+            loadGrades();
+        }
+    });
+
+    async function loadGrades(studentId) {
+        studentId = studentId || (role === 'student' ? userId : null);
+        
+        if (!studentId) {
+            return;
+        }
+        
+        try {
+            document.getElementById('gradesLoading').style.display = 'block';
+            document.getElementById('gradesContainer').style.display = 'none';
+            document.getElementById('noGrades').style.display = 'none';
+            
+            const response = await fetch(`/api/grades?student_id=${studentId}`);
+            const grades = await response.json();
+            
+            if (Object.keys(grades).length === 0) {
+                document.getElementById('gradesLoading').style.display = 'none';
+                document.getElementById('noGrades').style.display = 'block';
+                return;
+            }
+
+            renderGrades(grades);
+            
+            document.getElementById('gradesLoading').style.display = 'none';
+            document.getElementById('gradesContainer').style.display = 'block';
+
+        } catch (error) {
+            console.error('Failed to load grades:', error);
+            document.getElementById('gradesLoading').innerHTML = `
+                <div style="text-align: center; padding: 60px;">
+                    <i class="fas fa-exclamation-circle" style="font-size: 48px; color: var(--danger); margin-bottom: 15px;"></i>
+                    <p style="color: var(--danger); font-weight: 600;">Failed to load grades</p>
+                    <button class="btn btn-primary" onclick="loadGrades('${studentId}')" style="margin-top: 15px;">
+                        <i class="fas fa-sync"></i> Retry
+                    </button>
+                </div>
+            `;
+        }
+    }
+
+    function renderGrades(grades) {
+        const container = document.getElementById('gradesContainer');
+        
+        const html = Object.entries(grades).map(([subject, subjectGrades]) => {
+            // Calculate average
+            const total = subjectGrades.reduce((sum, g) => sum + g.percentage, 0);
+            const average = (total / subjectGrades.length).toFixed(2);
+            
+            let avgClass = 'poor';
+            let avgIcon = 'fa-frown';
+            if (average >= 80) {
+                avgClass = 'excellent';
+                avgIcon = 'fa-smile-beam';
+            } else if (average >= 70) {
+                avgClass = 'good';
+                avgIcon = 'fa-smile';
+            } else if (average >= 60) {
+                avgClass = 'average';
+                avgIcon = 'fa-meh';
+            }
+            
+            return `
+                <div class="subject-card">
+                    <div class="subject-header">
+                        <div class="subject-name">
+                            <div class="subject-icon">
+                                <i class="fas fa-book"></i>
+                            </div>
+                            ${subject}
+                        </div>
+                        <span class="average-badge ${avgClass}">
+                            <i class="fas ${avgIcon}"></i>
+                            Average: ${average}%
+                        </span>
+                    </div>
+                    
+                    <table class="grades-table">
+                        <thead>
+                            <tr>
+                                <th>Test Type</th>
+                                <th>Score</th>
+                                <th>Percentage</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${subjectGrades.map(grade => {
+                                let percentClass = 'poor';
+                                const percent = grade.percentage;
+                                if (percent >= 80) percentClass = 'excellent';
+                                else if (percent >= 70) percentClass = 'good';
+                                else if (percent >= 60) percentClass = 'average';
+                                
+                                return `
+                                    <tr>
+                                        <td>
+                                            <strong>${grade.test_type}</strong>
+                                        </td>
+                                        <td>
+                                            <div class="score-display">
+                                                ${grade.score} / ${grade.max_score}
+                                                <div class="progress-bar">
+                                                    <div class="progress-fill" style="width: ${percent}%; background: ${
+                                                        percentClass === 'excellent' ? '#10b981' :
+                                                        percentClass === 'good' ? '#3b82f6' :
+                                                        percentClass === 'average' ? '#f59e0b' : '#ef4444'
+                                                    };"></div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="percentage-cell percentage-${percentClass}">
+                                                ${percent}%
+                                            </span>
+                                        </td>
+                                        <td>
+                                            ${new Date(grade.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }).join('');
+        
+        container.innerHTML = html;
+    }
+
+    async function addGrade(event) {
+        event.preventDefault();
+        
+        const studentId = document.getElementById('studentId').value;
+        const subject = document.getElementById('gradeSubject').value;
+        const testType = document.getElementById('testType').value;
+        const score = parseFloat(document.getElementById('score').value);
+        const maxScore = parseFloat(document.getElementById('maxScore').value);
+        const date = document.getElementById('gradeDate').value;
+        
+        if (score > maxScore) {
+            alert('Score cannot be greater than maximum score');
+            return;
+        }
+        
+        try {
+            const response = await fetchWithCSRF('/api/grades', {
+                method: 'POST',
+                body: JSON.stringify({
+                    student_id: studentId,
+                    subject,
+                    test_type: testType,
+                    score,
+                    max_score: maxScore,
+                    date
+                })
+            });
+            
+            if (response.ok) {
+                alert('Grade added successfully!');
+                document.getElementById('gradeForm').reset();
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('gradeDate').value = today;
+                
+                // Reload grades if viewing this student
+                const searchInput = document.getElementById('searchStudent');
+                if (searchInput && searchInput.value === studentId) {
+                    loadGrades(studentId);
+                }
+            } else {
+                const error = await response.json();
+                alert(error.error || 'Failed to add grade');
+            }
+        } catch (error) {
+            console.error('Failed to add grade:', error);
+            alert('Failed to add grade');
+        }
+    }
+</script>
+{% endblock %}

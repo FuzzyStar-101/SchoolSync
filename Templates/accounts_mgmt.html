@@ -1,0 +1,405 @@
+{% extends "base.html" %}
+
+{% block title %}Accounts Management - SchoolSync Pro{% endblock %}
+{% block page_title %}Accounts Management{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h2><i class="fas fa-users-cog"></i> User Accounts</h2>
+            <p style="color: var(--secondary); margin-top: 5px; font-size: 14px;">Manage students, teachers, and administrators</p>
+        </div>
+        <button class="btn btn-primary" onclick="openAddAccountModal()">
+            <i class="fas fa-user-plus"></i> Add Account
+        </button>
+    </div>
+    
+    <div style="padding: 25px;">
+        <!-- Search and Filter -->
+        <div style="display: flex; gap: 15px; margin-bottom: 25px;">
+            <input type="text" class="form-control" id="searchInput" placeholder="Search by name, username, or ID..." 
+                   style="flex: 1;" onkeyup="filterAccounts()">
+            <select class="form-control" id="roleFilter" onchange="filterAccounts()" style="max-width: 200px;">
+                <option value="">All Roles</option>
+                <option value="student">Students</option>
+                <option value="teacher">Teachers</option>
+                <option value="admin">Admins</option>
+            </select>
+        </div>
+
+        <div id="accountsLoading" style="text-align: center; padding: 60px;">
+            <div class="spinner"></div>
+            <p style="color: var(--secondary); margin-top: 15px;">Loading accounts...</p>
+        </div>
+
+        <div id="accountsContainer" style="display: none; overflow-x: auto;">
+            <table style="min-width: 1200px;">
+                <thead>
+                    <tr>
+                        <th>User ID</th>
+                        <th>Name</th>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Class/Subjects</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="accountsTable"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add Account Modal -->
+<div class="modal" id="addAccountModal">
+    <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">
+            <h2>Add New Account</h2>
+            <button class="close-modal" onclick="closeAddAccountModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <form id="addAccountForm" onsubmit="createAccount(event)">
+                <div class="form-group">
+                    <label>Name <span style="color: var(--danger);">*</span></label>
+                    <input type="text" class="form-control" id="accName" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Username <span style="color: var(--danger);">*</span></label>
+                    <input type="text" class="form-control" id="accUsername" required>
+                    <small style="color: var(--secondary);">Must be unique</small>
+                </div>
+                
+                <div class="form-group">
+                    <label>Password <span style="color: var(--danger);">*</span></label>
+                    <input type="password" class="form-control" id="accPassword" required minlength="8">
+                    <small style="color: var(--secondary);">Minimum 8 characters</small>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" class="form-control" id="accEmail">
+                    </div>
+                    <div class="form-group">
+                        <label>Phone</label>
+                        <input type="tel" class="form-control" id="accPhone">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Role <span style="color: var(--danger);">*</span></label>
+                    <select class="form-control" id="accRole" onchange="toggleRoleFields()" required>
+                        <option value="">Select role...</option>
+                        <option value="student">Student</option>
+                        <option value="teacher">Teacher</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                
+                <div class="form-group" id="classField" style="display: none;">
+                    <label>Class <span style="color: var(--danger);">*</span></label>
+                    <input type="text" class="form-control" id="accClass" placeholder="e.g., 5A">
+                </div>
+                
+                <div class="form-group" id="subjectsField" style="display: none;">
+                    <label>Subjects</label>
+                    <input type="text" class="form-control" id="accSubjects" placeholder="e.g., Math, Science">
+                    <small style="color: var(--secondary);">Comma-separated list</small>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    <i class="fas fa-user-plus"></i> Create Account
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Reset Password Modal -->
+<div class="modal" id="resetPasswordModal">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h2>Reset Password</h2>
+            <button class="close-modal" onclick="closeResetPasswordModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <p style="margin-bottom: 20px; color: var(--secondary);">
+                Enter a new password for <strong id="resetUserName"></strong>:
+            </p>
+            <form id="resetPasswordForm" onsubmit="resetPassword(event)">
+                <input type="hidden" id="resetUserId">
+                <div class="form-group">
+                    <label>New Password <span style="color: var(--danger);">*</span></label>
+                    <input type="password" class="form-control" id="newPassword" required minlength="8">
+                    <small style="color: var(--secondary);">Minimum 8 characters</small>
+                </div>
+                <div class="form-group">
+                    <label>Confirm Password <span style="color: var(--danger);">*</span></label>
+                    <input type="password" class="form-control" id="confirmPassword" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    <i class="fas fa-key"></i> Reset Password
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    .role-badge {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        display: inline-block;
+    }
+    
+    .role-student { background: #dbeafe; color: #1e40af; }
+    .role-teacher { background: #d1fae5; color: #065f46; }
+    .role-admin { background: #fef3c7; color: #92400e; }
+    
+    .status-badge {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    
+    .status-active { background: #d1fae5; color: #065f46; }
+    .status-inactive { background: #fee2e2; color: #991b1b; }
+    
+    .action-btn {
+        padding: 6px 12px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 13px;
+        transition: all 0.3s;
+        margin: 0 3px;
+    }
+    
+    .action-btn:hover {
+        transform: translateY(-2px);
+    }
+    
+    .btn-reset {
+        background: var(--warning);
+        color: white;
+    }
+    
+    .btn-delete {
+        background: var(--danger);
+        color: white;
+    }
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let allAccounts = [];
+    
+    document.addEventListener('DOMContentLoaded', loadAccounts);
+    
+    async function loadAccounts() {
+        try {
+            const response = await fetch('/api/admin/accounts?page=1');
+            allAccounts = await response.json();
+            
+            renderAccounts(allAccounts);
+            
+            document.getElementById('accountsLoading').style.display = 'none';
+            document.getElementById('accountsContainer').style.display = 'block';
+        } catch (error) {
+            console.error('Failed to load accounts:', error);
+        }
+    }
+    
+    function renderAccounts(accounts) {
+        const tbody = document.getElementById('accountsTable');
+        
+        if (accounts.length === 0) {
+            tbody.innerHTML = `
+                <tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--secondary);">
+                    No accounts found
+                </td></tr>
+            `;
+            return;
+        }
+        
+        tbody.innerHTML = accounts.map(acc => `
+            <tr>
+                <td><strong>${acc.user_id}</strong></td>
+                <td>${acc.name}</td>
+                <td>${acc.username}</td>
+                <td>${acc.email || '-'}</td>
+                <td><span class="role-badge role-${acc.role}">${acc.role}</span></td>
+                <td>${acc.class_name || acc.subjects || '-'}</td>
+                <td>
+                    <span class="status-badge status-${acc.is_active ? 'active' : 'inactive'}">
+                        ${acc.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                </td>
+                <td>
+                    <button class="action-btn btn-reset" onclick="openResetPasswordModal('${acc.user_id}', '${acc.name}')" title="Reset Password">
+                        <i class="fas fa-key"></i>
+                    </button>
+                    <button class="action-btn btn-delete" onclick="deleteAccount('${acc.user_id}', '${acc.name}')" title="Delete">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+    
+    function filterAccounts() {
+        const search = document.getElementById('searchInput').value.toLowerCase();
+        const role = document.getElementById('roleFilter').value;
+        
+        const filtered = allAccounts.filter(acc => {
+            const matchesSearch = !search || 
+                acc.name.toLowerCase().includes(search) ||
+                acc.username.toLowerCase().includes(search) ||
+                acc.user_id.toLowerCase().includes(search);
+            const matchesRole = !role || acc.role === role;
+            return matchesSearch && matchesRole;
+        });
+        
+        renderAccounts(filtered);
+    }
+    
+    function openAddAccountModal() {
+        document.getElementById('addAccountModal').classList.add('active');
+    }
+    
+    function closeAddAccountModal() {
+        document.getElementById('addAccountModal').classList.remove('active');
+        document.getElementById('addAccountForm').reset();
+    }
+    
+    function toggleRoleFields() {
+        const role = document.getElementById('accRole').value;
+        document.getElementById('classField').style.display = role === 'student' ? 'block' : 'none';
+        document.getElementById('subjectsField').style.display = role === 'teacher' ? 'block' : 'none';
+    }
+    
+    async function createAccount(event) {
+        event.preventDefault();
+        
+        const data = {
+            name: document.getElementById('accName').value,
+            username: document.getElementById('accUsername').value,
+            password: document.getElementById('accPassword').value,
+            email: document.getElementById('accEmail').value,
+            phone: document.getElementById('accPhone').value,
+            role: document.getElementById('accRole').value,
+            class_name: document.getElementById('accClass').value,
+            subjects: document.getElementById('accSubjects').value
+        };
+        
+        try {
+            const response = await fetchWithCSRF('/api/admin/accounts', {
+                method: 'POST',
+                body: JSON.stringify(data)
+            });
+            
+            if (response.ok) {
+                alert('Account created successfully!');
+                closeAddAccountModal();
+                await loadAccounts();
+            } else {
+                const error = await response.json();
+                alert(error.error || 'Failed to create account');
+            }
+        } catch (error) {
+            console.error('Failed to create account:', error);
+            alert('Failed to create account');
+        }
+    }
+    
+    function openResetPasswordModal(userId, userName) {
+        document.getElementById('resetUserId').value = userId;
+        document.getElementById('resetUserName').textContent = userName;
+        document.getElementById('resetPasswordModal').classList.add('active');
+    }
+    
+    function closeResetPasswordModal() {
+        document.getElementById('resetPasswordModal').classList.remove('active');
+        document.getElementById('resetPasswordForm').reset();
+    }
+    
+    async function resetPassword(event) {
+        event.preventDefault();
+        
+        const newPass = document.getElementById('newPassword').value;
+        const confirmPass = document.getElementById('confirmPassword').value;
+        
+        if (newPass !== confirmPass) {
+            alert('Passwords do not match');
+            return;
+        }
+        
+        const userId = document.getElementById('resetUserId').value;
+        
+        try {
+            const response = await fetchWithCSRF('/api/admin/reset-password', {
+                method: 'POST',
+                body: JSON.stringify({
+                    user_id: userId,
+                    new_password: newPass
+                })
+            });
+            
+            if (response.ok) {
+                alert('Password reset successfully!');
+                closeResetPasswordModal();
+            } else {
+                const error = await response.json();
+                alert(error.error || 'Failed to reset password');
+            }
+        } catch (error) {
+            console.error('Failed to reset password:', error);
+            alert('Failed to reset password');
+        }
+    }
+    
+    async function deleteAccount(userId, userName) {
+        if (!confirm(`Are you sure you want to delete ${userName}? This action cannot be undone.`)) {
+            return;
+        }
+        
+        try {
+            const response = await fetchWithCSRF(`/api/admin/accounts?id=${userId}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                await loadAccounts();
+            } else {
+                const error = await response.json();
+                alert(error.error || 'Failed to delete account');
+            }
+        } catch (error) {
+            console.error('Failed to delete account:', error);
+            alert('Failed to delete account');
+        }
+    }
+    
+    window.onclick = function(event) {
+        if (event.target === document.getElementById('addAccountModal')) {
+            closeAddAccountModal();
+        }
+        if (event.target === document.getElementById('resetPasswordModal')) {
+            closeResetPasswordModal();
+        }
+    }
+</script>
+{% endblock %}

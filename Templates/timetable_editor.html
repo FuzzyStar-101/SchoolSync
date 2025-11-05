@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+
+{% block title %}Timetable Editor - SchoolSync Pro{% endblock %}
+{% block page_title %}Timetable Editor{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h2><i class="fas fa-table"></i> Class Timetable Editor</h2>
+            <p style="color: var(--secondary); margin-top: 5px; font-size: 14px;">Manage class schedules and assignments</p>
+        </div>
+        <a href="/experimental" class="btn" style="background: var(--warning); color: white;">
+            <i class="fas fa-magic"></i> AI Generator
+        </a>
+    </div>
+    
+    <div style="padding: 25px;">
+        <!-- Class Selector -->
+        <div style="display: flex; gap: 15px; margin-bottom: 25px;">
+            <div class="form-group" style="flex: 1; margin: 0;">
+                <label>Select Class</label>
+                <select class="form-control" id="classSelect" onchange="loadSchedule()">
+                    <option value="">Choose a class...</option>
+                </select>
+            </div>
+            <div style="display: flex; align-items: flex-end; gap: 10px;">
+                <button id="saveBtn" class="btn btn-primary" onclick="saveSchedule()" style="display: none;">
+                    <i class="fas fa-save"></i> Save Schedule
+                </button>
+                <button class="btn btn-secondary" onclick="clearSchedule()">
+                    <i class="fas fa-eraser"></i> Clear
+                </button>
+            </div>
+        </div>
+
+        <div id="scheduleGrid" style="display: none; overflow-x: auto;">
+            <table style="min-width: 1200px; border-collapse: separate; border-spacing: 2px;">
+                <thead>
+                    <tr>
+                        <th style="background: var(--dark); color: white; padding: 15px; width: 100px;">Period</th>
+                        <th style="background: var(--dark); color: white; padding: 15px;">Monday</th>
+                        <th style="background: var(--dark); color: white; padding: 15px;">Tuesday</th>
+                        <th style="background: var(--dark); color: white; padding: 15px;">Wednesday</th>
+                        <th style="background: var(--dark); color: white; padding: 15px;">Thursday</th>
+                        <th style="background: var(--dark); color: white; padding: 15px;">Friday</th>
+                        <th style="background: var(--dark); color: white; padding: 15px;">Saturday</th>
+                    </tr>
+                </thead>
+                <tbody id="scheduleBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+    .schedule-cell {
+        padding: 10px;
+        background: white;
+        vertical-align: top;
+        min-height: 100px;
+    }
+    
+    .schedule-cell select {
+        width: 100%;
+        padding: 8px;
+        border: 2px solid var(--light);
+        border-radius: 8px;
+        margin-bottom: 8px;
+        font-size: 13px;
+    }
+    
+    .schedule-cell select:focus {
+        border-color: var(--primary);
+        outline: none;
+    }
+    
+    .period-label {
+        background: var(--light);
+        padding: 15px;
+        text-align: center;
+        font-weight: 600;
+        color: var(--dark);
+    }
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentClass = '';
+    let scheduleData = {};
+    let subjects = [];
+    let teachers = [];
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        await loadClasses();
+        await loadSubjects();
+        await loadTeachers();
+    });
+
+    async function loadClasses() {
+        const response = await fetch('/api/admin/classes-list');
+        const classes = await response.json();
+        
+        const select = document.getElementById('classSelect');
+        classes.forEach(cls => {
+            const option = document.createElement('option');
+            option.value = cls.name;
+            option.textContent = cls.name;
+            select.appendChild(option);
+        });
+    }
+
+    async function loadSubjects() {
+        const response = await fetch('/api/admin/subjects');
+        subjects = await response.json();
+    }
+
+    async function loadTeachers() {
+        const response = await fetch('/api/admin/teachers-list');
+        teachers = await response.json();
+    }
+
+    async function loadSchedule() {
+        currentClass = document.getElementById('classSelect').value;
+        if (!currentClass) {
+            document.getElementById('scheduleGrid').style.display = 'none';
+            return;
+        }
+
+        const response = await fetch(`/api/admin/schedule?class=${currentClass}`);
+        scheduleData = await response.json();
+        
+        renderSchedule();
+        document.getElementById('scheduleGrid').style.display = 'block';
+        document.getElementById('saveBtn').style.display = 'block';
+    }
+
+    function renderSchedule() {
+        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const tbody = document.getElementById('scheduleBody');
+        
+        let html = '';
+        for (let period = 1; period <= 8; period++) {
+            html += '<tr>';
+            html += `<td class="period-label">Period ${period}</td>`;
+            
+            days.forEach(day => {
+                const entry = scheduleData[day][period];
+                html += `
+                    <td class="schedule-cell">
+                        <select data-day="${day}" data-period="${period}" data-type="subject" onchange="updateCell(this)">
+                            <option value="">Select Subject</option>
+                            ${subjects.map(s => `
+                                <option value="${s.name}" ${entry.subject === s.name ? 'selected' : ''}>
+                                    ${s.name}
+                                </option>
+                            `).join('')}
+                        </select>
+                        <select data-day="${day}" data-period="${period}" data-type="teacher" onchange="updateCell(this)">
+                            <option value="">Select Teacher</option>
+                            ${teachers.map(t => `
+                                <option value="${t.user_id}" ${entry.teacher_id === t.user_id ? 'selected' : ''}>
+                                    ${t.name}
+                                </option>
+                            `).join('')}
+                        </select>
+                    </td>
+                `;
+            });
+            
+            html += '</tr>';
+        }
+        
+        tbody.innerHTML = html;
+    }
+
+    function updateCell(select) {
+        const day = select.dataset.day;
+        const period = select.dataset.period;
+        const type = select.dataset.type;
+        
+        if (type === 'subject') {
+            scheduleData[day][period].subject = select.value;
+        } else {
+            scheduleData[day][period].teacher_id = select.value;
+            const teacher = teachers.find(t => t.user_id === select.value);
+            scheduleData[day][period].teacher_name = teacher ? teacher.name : '';
+        }
+    }
+
+    async function saveSchedule() {
+        if (!currentClass) {
+            alert('Please select a class');
+            return;
+        }
+
+        try {
+            const response = await fetchWithCSRF('/api/admin/schedule', {
+                method: 'PUT',
+                body: JSON.stringify({
+                    class: currentClass,
+                    schedule: scheduleData
+                })
+            });
+
+            if (response.ok) {
+                alert('Schedule saved successfully!');
+            } else {
+                alert('Failed to save schedule');
+            }
+        } catch (error) {
+            console.error('Failed to save schedule:', error);
+            alert('Failed to save schedule');
+        }
+    }
+
+    function clearSchedule() {
+        if (!confirm('Clear all entries for this class?')) return;
+        
+        Object.keys(scheduleData).forEach(day => {
+            Object.keys(scheduleData[day]).forEach(period => {
+                scheduleData[day][period] = { subject: '', teacher_id: '', teacher_name: '' };
+            });
+        });
+        
+        renderSchedule();
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+
+{% block title %}Weekly Calendar - SchoolSync Pro{% endblock %}
+{% block page_title %}Weekly Calendar{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h2><i class="fas fa-calendar-week"></i> Weekly Schedule</h2>
+            <p style="color: var(--secondary); margin-top: 5px; font-size: 14px;">Your complete weekly timetable</p>
+        </div>
+        <a href="/schedule" class="btn btn-primary">
+            <i class="fas fa-calendar-day"></i> Today's Schedule
+        </a>
+    </div>
+    
+    <div style="padding: 25px;">
+        <div id="calendarLoading" style="text-align: center; padding: 60px;">
+            <div class="spinner"></div>
+            <p style="color: var(--secondary); margin-top: 15px;">Loading calendar...</p>
+        </div>
+
+        <div id="calendarContainer" style="display: none; overflow-x: auto;">
+            <table id="weeklyCalendar" style="min-width: 1000px; width: 100%;">
+                <thead>
+                    <tr>
+                        <th style="width: 100px;">Period</th>
+                        <th>Monday</th>
+                        <th>Tuesday</th>
+                        <th>Wednesday</th>
+                        <th>Thursday</th>
+                        <th>Friday</th>
+                        <th>Saturday</th>
+                    </tr>
+                </thead>
+                <tbody id="calendarBody"></tbody>
+            </table>
+        </div>
+
+        <!-- Legend -->
+        <div id="calendarLegend" style="display: none; margin-top: 25px; padding: 20px; background: var(--light); border-radius: 10px;">
+            <h4 style="color: var(--dark); margin-bottom: 15px;">Legend</h4>
+            <div style="display: flex; gap: 25px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 20px; height: 20px; background: #dbeafe; border: 2px solid var(--primary); border-radius: 5px;"></div>
+                    <span style="color: var(--secondary); font-size: 14px;">Current Period</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 20px; height: 20px; background: white; border: 2px solid var(--light); border-radius: 5px;"></div>
+                    <span style="color: var(--secondary); font-size: 14px;">Regular Class</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 20px; height: 20px; background: #f5f7fa; border: 2px solid var(--secondary); border-radius: 5px; opacity: 0.5;"></div>
+                    <span style="color: var(--secondary); font-size: 14px;">Free Period</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    #weeklyCalendar {
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    #weeklyCalendar th {
+        background: var(--dark);
+        color: white;
+        padding: 20px 15px;
+        text-align: center;
+        font-weight: 600;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        border-right: 2px solid rgba(255,255,255,0.1);
+    }
+
+    #weeklyCalendar th:last-child {
+        border-right: none;
+    }
+
+    #weeklyCalendar th:first-child {
+        text-align: left;
+        background: var(--primary);
+    }
+
+    #weeklyCalendar td {
+        padding: 15px;
+        border: 2px solid var(--light);
+        vertical-align: top;
+        background: white;
+        transition: all 0.3s;
+        min-height: 80px;
+    }
+
+    #weeklyCalendar td:first-child {
+        font-weight: 600;
+        color: var(--dark);
+        background: var(--light);
+        text-align: center;
+    }
+
+    #weeklyCalendar tr:hover td {
+        background: #fafafa;
+    }
+
+    #weeklyCalendar td.current-period {
+        background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
+        border-color: var(--primary);
+        box-shadow: inset 0 0 0 2px var(--primary);
+    }
+
+    .class-cell {
+        cursor: pointer;
+        min-height: 60px;
+    }
+
+    .class-cell:hover:not(:first-child) {
+        background: #f0f9ff !important;
+        transform: scale(1.02);
+    }
+
+    .subject-box {
+        background: white;
+        padding: 10px;
+        border-radius: 8px;
+        border-left: 4px solid var(--primary);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .subject-name {
+        font-weight: 600;
+        color: var(--dark);
+        font-size: 14px;
+        margin-bottom: 5px;
+    }
+
+    .teacher-name {
+        color: var(--secondary);
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .free-period {
+        color: var(--secondary);
+        font-style: italic;
+        font-size: 13px;
+        text-align: center;
+        opacity: 0.6;
+    }
+
+    .period-time {
+        display: block;
+        font-size: 11px;
+        color: var(--secondary);
+        margin-top: 5px;
+    }
+
+    /* Subject color variations */
+    .subject-box:nth-child(even) {
+        border-left-color: var(--success);
+    }
+
+    .subject-box:nth-child(3n) {
+        border-left-color: var(--warning);
+    }
+
+    .subject-box:nth-child(5n) {
+        border-left-color: #8b5cf6;
+    }
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const today = new Date();
+    const currentDay = days[today.getDay()];
+    
+    const periodTimes = {
+        1: { start: '08:00', end: '08:45' },
+        2: { start: '08:45', end: '09:30' },
+        3: { start: '09:30', end: '10:15' },
+        4: { start: '10:30', end: '11:15' },
+        5: { start: '11:15', end: '12:00' },
+        6: { start: '12:00', end: '12:45' },
+        7: { start: '12:45', end: '13:30' },
+        8: { start: '13:30', end: '14:15' }
+    };
+
+    document.addEventListener('DOMContentLoaded', loadCalendar);
+
+    async function loadCalendar() {
+        try {
+            const response = await fetch('/api/schedule');
+            const schedule = await response.json();
+            
+            const calendarBody = document.getElementById('calendarBody');
+            const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            
+            let html = '';
+            
+            for (let period = 1; period <= 8; period++) {
+                html += '<tr>';
+                
+                // Period column
+                html += `
+                    <td>
+                        <strong>Period ${period}</strong>
+                        <span class="period-time">${periodTimes[period].start} - ${periodTimes[period].end}</span>
+                    </td>
+                `;
+                
+                // Day columns
+                weekDays.forEach(day => {
+                    const entry = schedule[day] && schedule[day][period] ? schedule[day][period] : { subject: '', teacher: '' };
+                    const isCurrentPeriod = (day === currentDay) && isCurrentTime(period);
+                    
+                    html += `<td class="class-cell ${isCurrentPeriod ? 'current-period' : ''}">`;
+                    
+                    if (entry.subject) {
+                        html += `
+                            <div class="subject-box">
+                                <div class="subject-name">${entry.subject}</div>
+                                <div class="teacher-name">
+                                    <i class="fas fa-user"></i>
+                                    ${entry.teacher || 'Not assigned'}
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        html += '<div class="free-period"><i class="fas fa-mug-hot"></i> Free</div>';
+                    }
+                    
+                    html += '</td>';
+                });
+                
+                html += '</tr>';
+            }
+            
+            calendarBody.innerHTML = html;
+            
+            document.getElementById('calendarLoading').style.display = 'none';
+            document.getElementById('calendarContainer').style.display = 'block';
+            document.getElementById('calendarLegend').style.display = 'block';
+
+        } catch (error) {
+            console.error('Failed to load calendar:', error);
+            document.getElementById('calendarLoading').innerHTML = `
+                <div style="text-align: center; padding: 60px;">
+                    <i class="fas fa-exclamation-circle" style="font-size: 48px; color: var(--danger); margin-bottom: 15px;"></i>
+                    <p style="color: var(--danger); font-weight: 600;">Failed to load calendar</p>
+                    <button class="btn btn-primary" onclick="loadCalendar()" style="margin-top: 15px;">
+                        <i class="fas fa-sync"></i> Retry
+                    </button>
+                </div>
+            `;
+        }
+    }
+
+    function isCurrentTime(period) {
+        const now = new Date();
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+        const currentTime = currentHour * 60 + currentMinute;
+        
+        const times = periodTimes[period];
+        const [startHour, startMinute] = times.start.split(':').map(Number);
+        const [endHour, endMinute] = times.end.split(':').map(Number);
+        
+        const startTime = startHour * 60 + startMinute;
+        const endTime = endHour * 60 + endMinute;
+        
+        return currentTime >= startTime && currentTime < endTime;
+    }
+</script>
+{% endblock %}

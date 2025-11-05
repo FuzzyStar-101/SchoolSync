@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+
+{% block title %}Account - SchoolSync Pro{% endblock %}
+{% block page_title %}My Account{% endblock %}
+
+{% block content %}
+<!-- First Login Banner -->
+<div id="firstLoginBanner" class="alert alert-info" style="display: none;">
+    <i class="fas fa-info-circle"></i>
+    <div style="flex: 1;">
+        <strong>Welcome to SchoolSync Pro!</strong>
+        <p style="margin: 5px 0 0 0;">This is your first login. We recommend changing your password for security.</p>
+    </div>
+    <button onclick="dismissBanner()" style="background: none; border: none; cursor: pointer; color: #1e40af; font-size: 20px;">
+        <i class="fas fa-times"></i>
+    </button>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2><i class="fas fa-user-circle"></i> Account Information</h2>
+    </div>
+    <div style="padding: 30px;">
+        <div id="accountLoading" style="text-align: center; padding: 40px;">
+            <div class="spinner"></div>
+            <p style="color: var(--secondary); margin-top: 15px;">Loading account information...</p>
+        </div>
+
+        <div id="accountData" style="display: none;">
+            <!-- Profile Header -->
+            <div style="display: flex; align-items: center; gap: 25px; padding: 25px; background: var(--light); border-radius: 15px; margin-bottom: 30px;">
+                <div class="user-avatar" id="accountAvatar" style="width: 100px; height: 100px; font-size: 40px;">
+                    U
+                </div>
+                <div style="flex: 1;">
+                    <h2 id="accountName" style="color: var(--dark); margin-bottom: 8px;">Loading...</h2>
+                    <p id="accountRole" style="color: var(--secondary); font-size: 16px; margin-bottom: 8px;">Role • User ID</p>
+                    <button class="btn btn-primary" onclick="openProfileModal()" style="padding: 8px 20px; font-size: 14px;">
+                        <i class="fas fa-edit"></i> Edit Profile
+                    </button>
+                </div>
+            </div>
+
+            <!-- Account Details Grid -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+                <!-- Personal Information Card -->
+                <div style="background: white; padding: 25px; border-radius: 15px; border: 2px solid var(--light);">
+                    <h3 style="color: var(--dark); margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-id-card" style="color: var(--primary);"></i>
+                        Personal Information
+                    </h3>
+                    <div class="info-row">
+                        <span class="info-label">Full Name</span>
+                        <span class="info-value" id="infoName">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Username</span>
+                        <span class="info-value" id="infoUsername">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">User ID</span>
+                        <span class="info-value" id="infoUserId">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Role</span>
+                        <span class="info-value" id="infoRole">-</span>
+                    </div>
+                </div>
+
+                <!-- Contact Information Card -->
+                <div style="background: white; padding: 25px; border-radius: 15px; border: 2px solid var(--light);">
+                    <h3 style="color: var(--dark); margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-envelope" style="color: var(--success);"></i>
+                        Contact Information
+                    </h3>
+                    <div class="info-row">
+                        <span class="info-label">Email</span>
+                        <span class="info-value" id="infoEmail">Not provided</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Phone</span>
+                        <span class="info-value" id="infoPhone">Not provided</span>
+                    </div>
+                </div>
+
+                <!-- Academic Information Card (if applicable) -->
+                <div id="academicCard" style="background: white; padding: 25px; border-radius: 15px; border: 2px solid var(--light); display: none;">
+                    <h3 style="color: var(--dark); margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-graduation-cap" style="color: var(--warning);"></i>
+                        Academic Information
+                    </h3>
+                    <div class="info-row">
+                        <span class="info-label">Class</span>
+                        <span class="info-value" id="infoClass">-</span>
+                    </div>
+                    <div class="info-row" id="subjectsRow" style="display: none;">
+                        <span class="info-label">Subjects</span>
+                        <span class="info-value" id="infoSubjects">-</span>
+                    </div>
+                </div>
+
+                <!-- Account Status Card -->
+                <div style="background: white; padding: 25px; border-radius: 15px; border: 2px solid var(--light);">
+                    <h3 style="color: var(--dark); margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-shield-alt" style="color: var(--danger);"></i>
+                        Account Status
+                    </h3>
+                    <div class="info-row">
+                        <span class="info-label">Status</span>
+                        <span class="info-value">
+                            <span style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; background: #d1fae5; color: #065f46; border-radius: 20px; font-size: 13px; font-weight: 600;">
+                                <i class="fas fa-check-circle"></i> Active
+                            </span>
+                        </span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Member Since</span>
+                        <span class="info-value" id="infoCreated">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Last Password Change</span>
+                        <span class="info-value" id="infoPasswordChange">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div style="margin-top: 30px; padding: 25px; background: var(--light); border-radius: 15px;">
+                <h3 style="color: var(--dark); margin-bottom: 20px;">Quick Actions</h3>
+                <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                    <button class="btn btn-primary" onclick="openProfileModal()">
+                        <i class="fas fa-user-edit"></i> Edit Profile
+                    </button>
+                    <button class="btn" style="background: var(--warning); color: white;" onclick="openProfileModal(); switchTab('security')">
+                        <i class="fas fa-key"></i> Change Password
+                    </button>
+                    <button class="btn" style="background: var(--secondary); color: white;" onclick="window.location.href='/logout'">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        padding: 15px 0;
+        border-bottom: 1px solid var(--light);
+    }
+
+    .info-row:last-child {
+        border-bottom: none;
+    }
+
+    .info-label {
+        color: var(--secondary);
+        font-weight: 500;
+        font-size: 14px;
+    }
+
+    .info-value {
+        color: var(--dark);
+        font-weight: 600;
+        text-align: right;
+        font-size: 14px;
+    }
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', loadAccount);
+
+    async function loadAccount() {
+        try {
+            const response = await fetch('/api/account');
+            const data = await response.json();
+
+            // Show first login banner if applicable
+            if (data.first_login) {
+                document.getElementById('firstLoginBanner').style.display = 'flex';
+            }
+
+            // Update avatar
+            const avatar = document.getElementById('accountAvatar');
+            if (data.avatar_type === 'uploaded') {
+                avatar.innerHTML = `<img src="${data.avatar_data}" alt="Avatar">`;
+            } else if (data.avatar_type === 'gradient') {
+                avatar.style.background = data.avatar_data;
+                avatar.textContent = '';
+            } else {
+                avatar.textContent = data.avatar_data || data.name.charAt(0).toUpperCase();
+            }
+
+            // Update header
+            document.getElementById('accountName').textContent = data.name;
+            document.getElementById('accountRole').textContent = `${data.role.charAt(0).toUpperCase() + data.role.slice(1)} • ${data.user_id}`;
+
+            // Update personal information
+            document.getElementById('infoName').textContent = data.name;
+            document.getElementById('infoUsername').textContent = data.username;
+            document.getElementById('infoUserId').textContent = data.user_id;
+            document.getElementById('infoRole').innerHTML = `
+                <span style="padding: 4px 12px; background: var(--primary); color: white; border-radius: 20px; font-size: 13px; font-weight: 600;">
+                    ${data.role.charAt(0).toUpperCase() + data.role.slice(1)}
+                </span>
+            `;
+
+            // Update contact information
+            document.getElementById('infoEmail').textContent = data.email || 'Not provided';
+            document.getElementById('infoPhone').textContent = data.phone || 'Not provided';
+
+            // Update academic information
+            if (data.class_name || data.subjects) {
+                document.getElementById('academicCard').style.display = 'block';
+                if (data.class_name) {
+                    document.getElementById('infoClass').textContent = data.class_name;
+                }
+                if (data.subjects) {
+                    document.getElementById('subjectsRow').style.display = 'flex';
+                    document.getElementById('infoSubjects').textContent = data.subjects;
+                }
+            }
+
+            // Update account status
+            if (data.created_at) {
+                const created = new Date(data.created_at);
+                document.getElementById('infoCreated').textContent = created.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+            }
+
+            if (data.last_password_change) {
+                const pwChange = new Date(data.last_password_change);
+                document.getElementById('infoPasswordChange').textContent = pwChange.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+            }
+
+            // Show data, hide loading
+            document.getElementById('accountLoading').style.display = 'none';
+            document.getElementById('accountData').style.display = 'block';
+
+        } catch (error) {
+            console.error('Failed to load account:', error);
+            document.getElementById('accountLoading').innerHTML = `
+                <div style="text-align: center; padding: 40px;">
+                    <i class="fas fa-exclamation-circle" style="font-size: 48px; color: var(--danger); margin-bottom: 15px;"></i>
+                    <p style="color: var(--danger); font-weight: 600;">Failed to load account information</p>
+                    <button class="btn btn-primary" onclick="loadAccount()" style="margin-top: 15px;">
+                        <i class="fas fa-sync"></i> Retry
+                    </button>
+                </div>
+            `;
+        }
+    }
+
+    function dismissBanner() {
+        document.getElementById('firstLoginBanner').style.display = 'none';
+    }
+</script>
+{% endblock %}

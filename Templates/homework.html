@@ -1,0 +1,871 @@
+{% extends "base.html" %}
+
+{% block title %}Homework - SchoolSync Pro{% endblock %}
+{% block page_title %}Homework Management{% endblock %}
+
+{% block content %}
+{% if session.role in ['teacher', 'admin', 'superadmin'] %}
+<!-- Add Homework Section -->
+<div class="card">
+    <div class="card-header">
+        <h2><i class="fas fa-plus-circle"></i> Create New Homework</h2>
+    </div>
+    <div style="padding: 25px;">
+        <form id="homeworkForm" onsubmit="createHomework(event)">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div class="form-group">
+                    <label>Subject <span style="color: var(--danger);">*</span></label>
+                    <input type="text" class="form-control" id="hwSubject" required>
+                </div>
+                <div class="form-group">
+                    <label>Class <span style="color: var(--danger);">*</span></label>
+                    <input type="text" class="form-control" id="hwClass" placeholder="e.g., 5A" required>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Title <span style="color: var(--danger);">*</span></label>
+                <input type="text" class="form-control" id="hwTitle" required>
+            </div>
+            
+            <div class="form-group">
+                <label>Description</label>
+                <textarea class="form-control" id="hwDescription" rows="4" placeholder="Homework details..."></textarea>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div class="form-group">
+                    <label>Date Given <span style="color: var(--danger);">*</span></label>
+                    <input type="date" class="form-control" id="hwDateGiven" required>
+                </div>
+                <div class="form-group">
+                    <label>Due Date <span style="color: var(--danger);">*</span></label>
+                    <input type="date" class="form-control" id="hwDueDate" required>
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary" style="width: 100%;">
+                <i class="fas fa-plus"></i> Create Homework
+            </button>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+<!-- Homework List -->
+<div class="card">
+    <div class="card-header">
+        <h2><i class="fas fa-book"></i> 
+            {% if session.role == 'student' %}
+                My Homework
+            {% else %}
+                All Homework
+            {% endif %}
+        </h2>
+    </div>
+    
+    <div style="padding: 25px;">
+        <div id="homeworkLoading" style="text-align: center; padding: 60px;">
+            <div class="spinner"></div>
+            <p style="color: var(--secondary); margin-top: 15px;">Loading homework...</p>
+        </div>
+
+        <div id="homeworkContainer" style="display: none;">
+            <div id="homeworkList"></div>
+        </div>
+
+        <div id="noHomework" style="display: none; text-align: center; padding: 60px;">
+            <i class="fas fa-clipboard-list" style="font-size: 64px; color: var(--secondary); opacity: 0.3; margin-bottom: 20px;"></i>
+            <h3 style="color: var(--secondary);">No Homework Found</h3>
+            <p style="color: var(--secondary); margin-top: 10px;">
+                {% if session.role in ['teacher', 'admin', 'superadmin'] %}
+                    Create your first homework assignment using the form above.
+                {% else %}
+                    No homework has been assigned yet.
+                {% endif %}
+            </p>
+        </div>
+    </div>
+</div>
+
+<style>
+    .homework-card {
+        background: white;
+        border: 2px solid var(--light);
+        border-radius: 15px;
+        padding: 25px;
+        margin-bottom: 20px;
+        transition: all 0.3s;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .homework-card::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 6px;
+        background: var(--primary);
+    }
+
+    .homework-card.overdue::before {
+        background: var(--danger);
+    }
+
+    .homework-card.due-soon::before {
+        background: var(--warning);
+    }
+
+    .homework-card:hover {
+        border-color: var(--primary);
+        box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15);
+        transform: translateY(-2px);
+    }
+
+    .homework-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        margin-bottom: 15px;
+    }
+
+    .homework-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--dark);
+        margin-bottom: 8px;
+    }
+
+    .homework-meta {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+        margin-top: 8px;
+    }
+
+    .meta-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--secondary);
+        font-size: 14px;
+    }
+
+    .homework-description {
+        color: var(--dark);
+        line-height: 1.6;
+        margin: 15px 0;
+        padding: 15px;
+        background: var(--light);
+        border-radius: 10px;
+    }
+
+    .homework-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 2px solid var(--light);
+    }
+
+    .due-badge {
+        padding: 6px 15px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .due-badge.overdue {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .due-badge.due-soon {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .due-badge.upcoming {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .subject-tag {
+        background: var(--primary);
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .class-tag {
+        background: var(--secondary);
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .delete-btn {
+        background: var(--danger);
+        color: white;
+        border: none;
+        padding: 8px 15px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 13px;
+        transition: all 0.3s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .delete-btn:hover {
+        background: #dc2626;
+        transform: translateY(-2px);
+    }
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        loadHomework();
+        // Set today's date as default
+        const today = new Date().toISOString().split('T')[0];
+        const dateGivenInput = document.getElementById('hwDateGiven');
+        if (dateGivenInput) {
+            dateGivenInput.value = today;
+        }
+    });
+
+    async function loadHomework() {
+        try {
+            const response = await fetch('/api/homework?page=1');
+            const homework = await response.json();
+            
+            if (homework.length === 0) {
+                document.getElementById('homeworkLoading').style.display = 'none';
+                document.getElementById('noHomework').style.display = 'block';
+                return;
+            }
+
+            renderHomework(homework);
+            
+            document.getElementById('homeworkLoading').style.display = 'none';
+            document.getElementById('homeworkContainer').style.display = 'block';
+
+        } catch (error) {
+            console.error('Failed to load homework:', error);
+            document.getElementById('homeworkLoading').innerHTML = `
+                <div style="text-align: center; padding: 60px;">
+                    <i class="fas fa-exclamation-circle" style="font-size: 48px; color: var(--danger); margin-bottom: 15px;"></i>
+                    <p style="color: var(--danger); font-weight: 600;">Failed to load homework</p>
+                    <button class="btn btn-primary" onclick="loadHomework()" style="margin-top: 15px;">
+                        <i class="fas fa-sync"></i> Retry
+                    </button>
+                </div>
+            `;
+        }
+    }
+
+    function renderHomework(homeworkList) {
+        const container = document.getElementById('homeworkList');
+        const isTeacher = {{ 'true' if session.role in ['teacher', 'admin', 'superadmin'] else 'false' }};
+        
+        const html = homeworkList.map(hw => {
+            const dueDate = new Date(hw.due_date);
+            const givenDate = new Date(hw.date_given);
+            const today = new Date();
+            const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+            
+            let dueBadge = '';
+            let cardClass = '';
+            
+            if (daysUntilDue < 0) {
+                dueBadge = `<span class="due-badge overdue"><i class="fas fa-exclamation-circle"></i> Overdue</span>`;
+                cardClass = 'overdue';
+            } else if (daysUntilDue <= 3) {
+                dueBadge = `<span class="due-badge due-soon"><i class="fas fa-clock"></i> Due in ${daysUntilDue} day${daysUntilDue !== 1 ? 's' : ''}</span>`;
+                cardClass = 'due-soon';
+            } else {
+                dueBadge = `<span class="due-badge upcoming"><i class="fas fa-calendar-check"></i> ${daysUntilDue} days remaining</span>`;
+            }
+            
+            return `
+                <div class="homework-card ${cardClass}">
+                    <div class="homework-header">
+                        <div style="flex: 1;">
+                            <div class="homework-title">${hw.title}</div>
+                            <div class="homework-meta">
+                                <span class="subject-tag">${hw.subject}</span>
+                                <span class="class-tag">${hw.class_name}</span>
+                                <span class="meta-item">
+                                    <i class="fas fa-chalkboard-teacher"></i>
+                                    ${hw.teacher || 'Not specified'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    ${hw.description ? `
+                        <div class="homework-description">
+                            ${hw.description}
+                        </div>
+                    ` : ''}
+                    
+                    <div class="homework-footer">
+                        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                            <div class="meta-item">
+                                <i class="fas fa-calendar-plus"></i>
+                                <strong>Given:</strong> ${givenDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </div>
+                            <div class="meta-item">
+                                <i class="fas fa-calendar-times"></i>
+                                <strong>Due:</strong> ${dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            ${dueBadge}
+                            ${isTeacher ? `
+                                <button class="delete-btn" onclick="deleteHomework(${hw.id})">
+                                    <i class="fas fa-trash"></i> Delete
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        container.innerHTML = html;
+    }
+
+    async function createHomework(event) {
+        event.preventDefault();
+        
+        const subject = document.getElementById('hwSubject').value;
+        const className = document.getElementById('hwClass').value;
+        const title = document.getElementById('hwTitle').value;
+        const description = document.getElementById('hwDescription').value;
+        const dateGiven = document.getElementById('hwDateGiven').value;
+        const dueDate = document.getElementById('hwDueDate').value;
+        
+        if (!subject || !className || !title || !dateGiven || !dueDate) {
+            alert('Please fill in all required fields');
+            return;
+        }
+        
+        if (new Date(dueDate) < new Date(dateGiven)) {
+            alert('Due date cannot be before date given');
+            return;
+        }
+        
+        try {
+            const response = await fetchWithCSRF('/api/homework', {
+                method: 'POST',
+                body: JSON.stringify({
+                    subject,
+                    class_name: className,
+                    title,
+                    description,
+                    date_given: dateGiven,
+                    due_date: dueDate
+                })
+            });
+            
+            if (response.ok) {
+                alert('Homework created successfully!');
+                document.getElementById('homeworkForm').reset();
+                // Set today's date again
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('hwDateGiven').value = today;
+                await loadHomework();
+            } else {
+                const error = await response.json();
+                alert(error.error || 'Failed to create homework');
+            }
+        } catch (error) {
+            console.error('Failed to create homework:', error);
+            alert('Failed to create homework');
+        }
+    }
+
+    async function deleteHomework(id) {
+        if (!confirm('Are you sure you want to delete this homework?')) {
+            return;
+        }
+        
+        try {
+            const response = await fetchWithCSRF(`/api/homework?id=${id}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                await loadHomework();
+            } else {
+                const error = await response.json();
+                alert(error.error || 'Failed to delete homework');
+            }
+        } catch (error) {
+            console.error('Failed to delete homework:', error);
+            alert('Failed to delete homework');
+        }
+    }
+</script>
+{% endblock %}{% extends "base.html" %}
+
+{% block title %}Grades - SchoolSync Pro{% endblock %}
+{% block page_title %}
+    {% if session.role == 'student' %}My Grades{% else %}Grades Management{% endif %}
+{% endblock %}
+
+{% block content %}
+{% if session.role in ['teacher', 'admin', 'superadmin'] %}
+<!-- Add Grade Section -->
+<div class="card">
+    <div class="card-header">
+        <h2><i class="fas fa-plus-circle"></i> Add New Grade</h2>
+    </div>
+    <div style="padding: 25px;">
+        <form id="gradeForm" onsubmit="addGrade(event)">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div class="form-group">
+                    <label>Student ID <span style="color: var(--danger);">*</span></label>
+                    <input type="text" class="form-control" id="studentId" placeholder="e.g., S001" required>
+                </div>
+                <div class="form-group">
+                    <label>Subject <span style="color: var(--danger);">*</span></label>
+                    <input type="text" class="form-control" id="gradeSubject" required>
+                </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
+                <div class="form-group">
+                    <label>Test Type <span style="color: var(--danger);">*</span></label>
+                    <select class="form-control" id="testType" required>
+                        <option value="">Select type...</option>
+                        <option value="Quiz">Quiz</option>
+                        <option value="Unit Test">Unit Test</option>
+                        <option value="Mid Term">Mid Term</option>
+                        <option value="Final Exam">Final Exam</option>
+                        <option value="Assignment">Assignment</option>
+                        <option value="Project">Project</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Score <span style="color: var(--danger);">*</span></label>
+                    <input type="number" class="form-control" id="score" min="0" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label>Maximum Score <span style="color: var(--danger);">*</span></label>
+                    <input type="number" class="form-control" id="maxScore" min="1" step="0.01" required>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Date <span style="color: var(--danger);">*</span></label>
+                <input type="date" class="form-control" id="gradeDate" required>
+            </div>
+            
+            <button type="submit" class="btn btn-primary" style="width: 100%;">
+                <i class="fas fa-plus"></i> Add Grade
+            </button>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+<!-- Grades Display -->
+<div class="card">
+    <div class="card-header">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2><i class="fas fa-chart-line"></i> 
+                {% if session.role == 'student' %}
+                    My Performance
+                {% else %}
+                    Student Grades
+                {% endif %}
+            </h2>
+            {% if session.role in ['teacher', 'admin', 'superadmin'] %}
+            <input type="text" class="form-control" id="searchStudent" 
+                   placeholder="Enter Student ID..." 
+                   style="max-width: 300px;"
+                   onkeyup="if(event.key === 'Enter') loadGrades(this.value)">
+            {% endif %}
+        </div>
+    </div>
+    
+    <div style="padding: 25px;">
+        <div id="gradesLoading" style="text-align: center; padding: 60px;">
+            <div class="spinner"></div>
+            <p style="color: var(--secondary); margin-top: 15px;">Loading grades...</p>
+        </div>
+
+        <div id="gradesContainer" style="display: none;"></div>
+
+        <div id="noGrades" style="display: none; text-align: center; padding: 60px;">
+            <i class="fas fa-clipboard-list" style="font-size: 64px; color: var(--secondary); opacity: 0.3; margin-bottom: 20px;"></i>
+            <h3 style="color: var(--secondary);">No Grades Found</h3>
+            <p style="color: var(--secondary); margin-top: 10px;">
+                {% if session.role in ['teacher', 'admin', 'superadmin'] %}
+                    Enter a Student ID to view grades or add new grades using the form above.
+                {% else %}
+                    No grades have been recorded yet.
+                {% endif %}
+            </p>
+        </div>
+    </div>
+</div>
+
+<style>
+    .subject-card {
+        background: white;
+        border: 2px solid var(--light);
+        border-radius: 15px;
+        padding: 25px;
+        margin-bottom: 20px;
+        transition: all 0.3s;
+    }
+
+    .subject-card:hover {
+        border-color: var(--primary);
+        box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15);
+    }
+
+    .subject-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid var(--light);
+    }
+
+    .subject-name {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--dark);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .subject-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        background: linear-gradient(135deg, var(--primary) 0%, #8b5cf6 100%);
+        color: white;
+    }
+
+    .average-badge {
+        padding: 10px 20px;
+        border-radius: 25px;
+        font-size: 18px;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .average-badge.excellent {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .average-badge.good {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+
+    .average-badge.average {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .average-badge.poor {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .grades-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    .grades-table thead {
+        background: var(--light);
+    }
+
+    .grades-table th {
+        padding: 15px;
+        text-align: left;
+        font-weight: 600;
+        color: var(--dark);
+        border-bottom: 2px solid #e2e8f0;
+    }
+
+    .grades-table td {
+        padding: 15px;
+        border-bottom: 1px solid var(--light);
+    }
+
+    .grades-table tr:hover td {
+        background: #fafafa;
+    }
+
+    .percentage-cell {
+        font-weight: 700;
+        font-size: 16px;
+    }
+
+    .percentage-excellent {
+        color: #065f46;
+    }
+
+    .percentage-good {
+        color: #1e40af;
+    }
+
+    .percentage-average {
+        color: #92400e;
+    }
+
+    .percentage-poor {
+        color: #991b1b;
+    }
+
+    .score-display {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .progress-bar {
+        width: 60px;
+        height: 8px;
+        background: var(--light);
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    .progress-fill {
+        height: 100%;
+        transition: width 0.3s;
+    }
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const role = '{{ session.role }}';
+    const userId = '{{ session.user_id }}';
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const today = new Date().toISOString().split('T')[0];
+        const dateInput = document.getElementById('gradeDate');
+        if (dateInput) {
+            dateInput.value = today;
+        }
+        
+        if (role === 'student') {
+            loadGrades();
+        }
+    });
+
+    async function loadGrades(studentId) {
+        studentId = studentId || (role === 'student' ? userId : null);
+        
+        if (!studentId) {
+            return;
+        }
+        
+        try {
+            document.getElementById('gradesLoading').style.display = 'block';
+            document.getElementById('gradesContainer').style.display = 'none';
+            document.getElementById('noGrades').style.display = 'none';
+            
+            const response = await fetch(`/api/grades?student_id=${studentId}`);
+            const grades = await response.json();
+            
+            if (Object.keys(grades).length === 0) {
+                document.getElementById('gradesLoading').style.display = 'none';
+                document.getElementById('noGrades').style.display = 'block';
+                return;
+            }
+
+            renderGrades(grades);
+            
+            document.getElementById('gradesLoading').style.display = 'none';
+            document.getElementById('gradesContainer').style.display = 'block';
+
+        } catch (error) {
+            console.error('Failed to load grades:', error);
+            document.getElementById('gradesLoading').innerHTML = `
+                <div style="text-align: center; padding: 60px;">
+                    <i class="fas fa-exclamation-circle" style="font-size: 48px; color: var(--danger); margin-bottom: 15px;"></i>
+                    <p style="color: var(--danger); font-weight: 600;">Failed to load grades</p>
+                    <button class="btn btn-primary" onclick="loadGrades('${studentId}')" style="margin-top: 15px;">
+                        <i class="fas fa-sync"></i> Retry
+                    </button>
+                </div>
+            `;
+        }
+    }
+
+    function renderGrades(grades) {
+        const container = document.getElementById('gradesContainer');
+        
+        const html = Object.entries(grades).map(([subject, subjectGrades]) => {
+            // Calculate average
+            const total = subjectGrades.reduce((sum, g) => sum + g.percentage, 0);
+            const average = (total / subjectGrades.length).toFixed(2);
+            
+            let avgClass = 'poor';
+            let avgIcon = 'fa-frown';
+            if (average >= 80) {
+                avgClass = 'excellent';
+                avgIcon = 'fa-smile-beam';
+            } else if (average >= 70) {
+                avgClass = 'good';
+                avgIcon = 'fa-smile';
+            } else if (average >= 60) {
+                avgClass = 'average';
+                avgIcon = 'fa-meh';
+            }
+            
+            return `
+                <div class="subject-card">
+                    <div class="subject-header">
+                        <div class="subject-name">
+                            <div class="subject-icon">
+                                <i class="fas fa-book"></i>
+                            </div>
+                            ${subject}
+                        </div>
+                        <span class="average-badge ${avgClass}">
+                            <i class="fas ${avgIcon}"></i>
+                            Average: ${average}%
+                        </span>
+                    </div>
+                    
+                    <table class="grades-table">
+                        <thead>
+                            <tr>
+                                <th>Test Type</th>
+                                <th>Score</th>
+                                <th>Percentage</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${subjectGrades.map(grade => {
+                                let percentClass = 'poor';
+                                const percent = grade.percentage;
+                                if (percent >= 80) percentClass = 'excellent';
+                                else if (percent >= 70) percentClass = 'good';
+                                else if (percent >= 60) percentClass = 'average';
+                                
+                                return `
+                                    <tr>
+                                        <td>
+                                            <strong>${grade.test_type}</strong>
+                                        </td>
+                                        <td>
+                                            <div class="score-display">
+                                                ${grade.score} / ${grade.max_score}
+                                                <div class="progress-bar">
+                                                    <div class="progress-fill" style="width: ${percent}%; background: ${
+                                                        percentClass === 'excellent' ? '#10b981' :
+                                                        percentClass === 'good' ? '#3b82f6' :
+                                                        percentClass === 'average' ? '#f59e0b' : '#ef4444'
+                                                    };"></div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="percentage-cell percentage-${percentClass}">
+                                                ${percent}%
+                                            </span>
+                                        </td>
+                                        <td>
+                                            ${new Date(grade.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }).join('');
+        
+        container.innerHTML = html;
+    }
+
+    async function addGrade(event) {
+        event.preventDefault();
+        
+        const studentId = document.getElementById('studentId').value;
+        const subject = document.getElementById('gradeSubject').value;
+        const testType = document.getElementById('testType').value;
+        const score = parseFloat(document.getElementById('score').value);
+        const maxScore = parseFloat(document.getElementById('maxScore').value);
+        const date = document.getElementById('gradeDate').value;
+        
+        if (score > maxScore) {
+            alert('Score cannot be greater than maximum score');
+            return;
+        }
+        
+        try {
+            const response = await fetchWithCSRF('/api/grades', {
+                method: 'POST',
+                body: JSON.stringify({
+                    student_id: studentId,
+                    subject,
+                    test_type: testType,
+                    score,
+                    max_score: maxScore,
+                    date
+                })
+            });
+            
+            if (response.ok) {
+                alert('Grade added successfully!');
+                document.getElementById('gradeForm').reset();
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('gradeDate').value = today;
+                
+                // Reload grades if viewing this student
+                const searchInput = document.getElementById('searchStudent');
+                if (searchInput && searchInput.value === studentId) {
+                    loadGrades(studentId);
+                }
+            } else {
+                const error = await response.json();
+                alert(error.error || 'Failed to add grade');
+            }
+        } catch (error) {
+            console.error('Failed to add grade:', error);
+            alert('Failed to add grade');
+        }
+    }
+</script>
+{% endblock %}

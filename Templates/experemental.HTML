@@ -1,0 +1,529 @@
+{% extends "base.html" %}
+
+{% block title %}Experimental Features - SchoolSync Pro{% endblock %}
+{% block page_title %}Experimental Features{% endblock %}
+
+{% block content %}
+<!-- Beta Warning Banner -->
+<div class="alert alert-warning">
+    <i class="fas fa-flask"></i>
+    <strong>Experimental Features:</strong> These features are in beta testing. Use with caution and always backup your data first.
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2><i class="fas fa-robot"></i> AI-Powered Schedule Generator</h2>
+    </div>
+    
+    <div style="padding: 25px;">
+        <p style="color: var(--secondary); margin-bottom: 25px;">
+            Automatically generate optimized timetables using intelligent algorithms. The system analyzes teacher availability, 
+            subject requirements, and balances workload across the week.
+        </p>
+
+        <div class="form-group">
+            <label>Select Class</label>
+            <select class="form-control" id="targetClass">
+                <option value="">Choose a class...</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Generation Strategy</label>
+            <select class="form-control" id="strategy">
+                <option value="balanced">Balanced Distribution (Recommended)</option>
+                <option value="clustered">Clustered Subjects (2-3 periods per day)</option>
+                <option value="random">Random with Conflict Avoidance</option>
+            </select>
+            <small style="color: var(--secondary); margin-top: 5px; display: block;">
+                Balanced: Spreads subjects evenly across the week<br>
+                Clustered: Groups subject periods on same days<br>
+                Random: Fills available slots randomly avoiding conflicts
+            </small>
+        </div>
+
+        <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 10px;">
+                <input type="checkbox" id="preserveExisting" checked>
+                Preserve existing schedule entries
+            </label>
+        </div>
+
+        <button class="btn btn-primary" onclick="generateSchedule()" id="generateBtn">
+            <i class="fas fa-magic"></i> Generate Schedule
+        </button>
+
+        <!-- Results Area -->
+        <div id="generationResults" style="margin-top: 25px; display: none;">
+            <h3 style="margin-bottom: 15px; color: var(--dark);">Generation Results</h3>
+            <div id="resultsContent"></div>
+        </div>
+
+        <!-- Preview Area -->
+        <div id="schedulePreview" style="margin-top: 25px; display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="color: var(--dark);">Schedule Preview</h3>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-success" onclick="applySchedule()">
+                        <i class="fas fa-check"></i> Apply to Timetable
+                    </button>
+                    <button class="btn btn-danger" onclick="cancelPreview()">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                </div>
+            </div>
+            <div style="overflow-x: auto;">
+                <table id="previewTable" style="min-width: 800px;">
+                    <thead>
+                        <tr>
+                            <th>Period</th>
+                            <th>Monday</th>
+                            <th>Tuesday</th>
+                            <th>Wednesday</th>
+                            <th>Thursday</th>
+                            <th>Friday</th>
+                            <th>Saturday</th>
+                        </tr>
+                    </thead>
+                    <tbody id="previewBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .result-item {
+        padding: 12px 15px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .result-success {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .result-warning {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .result-error {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .result-info {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+
+    #previewTable td {
+        background: white;
+        min-width: 120px;
+    }
+
+    .schedule-cell {
+        font-size: 13px;
+        line-height: 1.4;
+    }
+
+    .subject-name {
+        font-weight: 600;
+        color: var(--dark);
+    }
+
+    .teacher-name {
+        font-size: 11px;
+        color: var(--secondary);
+    }
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let generatedSchedule = null;
+    let selectedClass = null;
+
+    // Load classes on page load
+    document.addEventListener('DOMContentLoaded', async () => {
+        await loadClasses();
+    });
+
+    async function loadClasses() {
+        try {
+            const response = await fetch('/api/admin/classes-list');
+            const classes = await response.json();
+            
+            const select = document.getElementById('targetClass');
+            classes.forEach(cls => {
+                const option = document.createElement('option');
+                option.value = cls.name;
+                option.textContent = cls.name;
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Failed to load classes:', error);
+        }
+    }
+
+    async function generateSchedule() {
+        const className = document.getElementById('targetClass').value;
+        const strategy = document.getElementById('strategy').value;
+        const preserveExisting = document.getElementById('preserveExisting').checked;
+
+        if (!className) {
+            alert('Please select a class');
+            return;
+        }
+
+        selectedClass = className;
+        const btn = document.getElementById('generateBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Generating...';
+
+        document.getElementById('generationResults').style.display = 'block';
+        document.getElementById('resultsContent').innerHTML = '<div class="spinner"></div>';
+
+        try {
+            // Get existing schedule if preserving
+            let existingSchedule = {};
+            if (preserveExisting) {
+                const response = await fetch(`/api/admin/schedule?class=${className}`);
+                existingSchedule = await response.json();
+            }
+
+            // Get teacher-subject assignments
+            const tsResponse = await fetch('/api/admin/teacher-subjects');
+            const teacherSubjects = await tsResponse.json();
+
+            // Get all teachers
+            const teachersResponse = await fetch('/api/admin/teachers-list');
+            const teachers = await teachersResponse.json();
+
+            // Generate schedule based on strategy
+            const newSchedule = await generateScheduleByStrategy(
+                className,
+                existingSchedule,
+                teacherSubjects,
+                teachers,
+                strategy
+            );
+
+            generatedSchedule = newSchedule;
+
+            // Display results
+            displayResults(newSchedule);
+            displayPreview(newSchedule);
+
+        } catch (error) {
+            console.error('Generation error:', error);
+            document.getElementById('resultsContent').innerHTML = `
+                <div class="result-item result-error">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span>Failed to generate schedule: ${error.message}</span>
+                </div>
+            `;
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-magic"></i> Generate Schedule';
+        }
+    }
+
+    async function generateScheduleByStrategy(className, existing, teacherSubjects, teachers, strategy) {
+        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const periods = 8;
+        const schedule = {};
+
+        // Initialize schedule with existing entries
+        days.forEach(day => {
+            schedule[day] = {};
+            for (let p = 1; p <= periods; p++) {
+                const existingEntry = existing[day] && existing[day][p];
+                schedule[day][p] = existingEntry && existingEntry.subject ? 
+                    { ...existingEntry, preserved: true } : 
+                    { subject: '', teacher_id: '', teacher_name: '' };
+            }
+        });
+
+        // Group subjects by teacher for this class (simulate assignments)
+        const subjectAssignments = {};
+        teacherSubjects.forEach(ts => {
+            if (!subjectAssignments[ts.subject]) {
+                subjectAssignments[ts.subject] = [];
+            }
+            subjectAssignments[ts.subject].push(ts.teacher_id);
+        });
+
+        // Get unique subjects to assign (aim for 6-8 different subjects)
+        const subjects = Object.keys(subjectAssignments).slice(0, 8);
+
+        // Calculate periods needed per subject (balanced)
+        const totalEmptySlots = days.reduce((sum, day) => {
+            return sum + Object.values(schedule[day]).filter(s => !s.subject).length;
+        }, 0);
+
+        const periodsPerSubject = Math.floor(totalEmptySlots / subjects.length);
+
+        // Assign subjects based on strategy
+        if (strategy === 'balanced') {
+            await assignBalanced(schedule, subjects, subjectAssignments, periodsPerSubject, days, periods);
+        } else if (strategy === 'clustered') {
+            await assignClustered(schedule, subjects, subjectAssignments, periodsPerSubject, days, periods);
+        } else {
+            await assignRandom(schedule, subjects, subjectAssignments, periodsPerSubject, days, periods);
+        }
+
+        return schedule;
+    }
+
+    async function assignBalanced(schedule, subjects, subjectAssignments, periodsPerSubject, days, periods) {
+        for (const subject of subjects) {
+            const teachers = subjectAssignments[subject];
+            if (!teachers || teachers.length === 0) continue;
+
+            const teacherId = teachers[0];
+            const teacherResponse = await fetch(`/api/admin/teachers-list`);
+            const allTeachers = await teacherResponse.json();
+            const teacher = allTeachers.find(t => t.user_id === teacherId);
+
+            let assigned = 0;
+            const target = periodsPerSubject || 6;
+
+            // Try to assign evenly across days
+            for (const day of days) {
+                if (assigned >= target) break;
+
+                for (let p = 1; p <= periods; p++) {
+                    if (assigned >= target) break;
+
+                    // Check if slot is empty
+                    if (schedule[day][p].subject) continue;
+
+                    // Check if teacher is available
+                    const conflict = await checkTeacherConflict(teacherId, day, p, schedule);
+                    if (!conflict) {
+                        schedule[day][p] = {
+                            subject: subject,
+                            teacher_id: teacherId,
+                            teacher_name: teacher ? teacher.name : 'Unknown'
+                        };
+                        assigned++;
+                        break; // One per day for balance
+                    }
+                }
+            }
+        }
+    }
+
+    async function assignClustered(schedule, subjects, subjectAssignments, periodsPerSubject, days, periods) {
+        for (const subject of subjects) {
+            const teachers = subjectAssignments[subject];
+            if (!teachers || teachers.length === 0) continue;
+
+            const teacherId = teachers[0];
+            const teacherResponse = await fetch(`/api/admin/teachers-list`);
+            const allTeachers = await teacherResponse.json();
+            const teacher = allTeachers.find(t => t.user_id === teacherId);
+
+            let assigned = 0;
+            const target = periodsPerSubject || 6;
+
+            // Assign 2-3 periods per day
+            for (const day of days) {
+                if (assigned >= target) break;
+
+                let dailyCount = 0;
+                const dailyTarget = Math.min(3, target - assigned);
+
+                for (let p = 1; p <= periods; p++) {
+                    if (dailyCount >= dailyTarget || assigned >= target) break;
+
+                    if (schedule[day][p].subject) continue;
+
+                    const conflict = await checkTeacherConflict(teacherId, day, p, schedule);
+                    if (!conflict) {
+                        schedule[day][p] = {
+                            subject: subject,
+                            teacher_id: teacherId,
+                            teacher_name: teacher ? teacher.name : 'Unknown'
+                        };
+                        assigned++;
+                        dailyCount++;
+                    }
+                }
+            }
+        }
+    }
+
+    async function assignRandom(schedule, subjects, subjectAssignments, periodsPerSubject, days, periods) {
+        // Shuffle subjects for randomness
+        const shuffled = [...subjects].sort(() => Math.random() - 0.5);
+
+        for (const subject of shuffled) {
+            const teachers = subjectAssignments[subject];
+            if (!teachers || teachers.length === 0) continue;
+
+            const teacherId = teachers[0];
+            const teacherResponse = await fetch(`/api/admin/teachers-list`);
+            const allTeachers = await teacherResponse.json();
+            const teacher = allTeachers.find(t => t.user_id === teacherId);
+
+            let assigned = 0;
+            const target = periodsPerSubject || 6;
+
+            // Random day/period order
+            const dayOrder = [...days].sort(() => Math.random() - 0.5);
+
+            for (const day of dayOrder) {
+                if (assigned >= target) break;
+
+                const periodOrder = Array.from({length: periods}, (_, i) => i + 1).sort(() => Math.random() - 0.5);
+
+                for (const p of periodOrder) {
+                    if (assigned >= target) break;
+
+                    if (schedule[day][p].subject) continue;
+
+                    const conflict = await checkTeacherConflict(teacherId, day, p, schedule);
+                    if (!conflict) {
+                        schedule[day][p] = {
+                            subject: subject,
+                            teacher_id: teacherId,
+                            teacher_name: teacher ? teacher.name : 'Unknown'
+                        };
+                        assigned++;
+                    }
+                }
+            }
+        }
+    }
+
+    function checkTeacherConflict(teacherId, day, period, schedule) {
+        // Check if teacher is already assigned at this time in ANY class
+        return Object.values(schedule[day]).some(entry => 
+            entry.teacher_id === teacherId && 
+            Object.keys(schedule[day]).find(p => schedule[day][p] === entry) == period
+        );
+    }
+
+    function displayResults(schedule) {
+        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        let filledSlots = 0;
+        let emptySlots = 0;
+        let preservedSlots = 0;
+
+        days.forEach(day => {
+            Object.values(schedule[day]).forEach(entry => {
+                if (entry.subject) {
+                    filledSlots++;
+                    if (entry.preserved) preservedSlots++;
+                } else {
+                    emptySlots++;
+                }
+            });
+        });
+
+        const html = `
+            <div class="result-item result-success">
+                <i class="fas fa-check-circle"></i>
+                <span><strong>Schedule generated successfully!</strong></span>
+            </div>
+            <div class="result-item result-info">
+                <i class="fas fa-info-circle"></i>
+                <span>Total slots: ${filledSlots + emptySlots} | Filled: ${filledSlots} | Empty: ${emptySlots}</span>
+            </div>
+            ${preservedSlots > 0 ? `
+            <div class="result-item result-info">
+                <i class="fas fa-lock"></i>
+                <span>Preserved ${preservedSlots} existing entries</span>
+            </div>
+            ` : ''}
+        `;
+
+        document.getElementById('resultsContent').innerHTML = html;
+    }
+
+    function displayPreview(schedule) {
+        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const periods = 8;
+
+        let html = '';
+        for (let p = 1; p <= periods; p++) {
+            html += '<tr>';
+            html += `<td><strong>Period ${p}</strong></td>`;
+            
+            days.forEach(day => {
+                const entry = schedule[day][p];
+                let cellClass = entry.subject ? 'schedule-cell' : '';
+                let cellStyle = entry.preserved ? 'background: #fef3c7;' : '';
+                
+                html += `<td style="${cellStyle}">`;
+                if (entry.subject) {
+                    html += `
+                        <div class="${cellClass}">
+                            <div class="subject-name">${entry.subject}</div>
+                            <div class="teacher-name">${entry.teacher_name}</div>
+                            ${entry.preserved ? '<small style="color: #92400e;">Preserved</small>' : ''}
+                        </div>
+                    `;
+                } else {
+                    html += '<span style="color: var(--secondary);">—</span>';
+                }
+                html += '</td>';
+            });
+            
+            html += '</tr>';
+        }
+
+        document.getElementById('previewBody').innerHTML = html;
+        document.getElementById('schedulePreview').style.display = 'block';
+    }
+
+    async function applySchedule() {
+        if (!generatedSchedule || !selectedClass) {
+            alert('No schedule to apply');
+            return;
+        }
+
+        if (!confirm(`Apply this schedule to ${selectedClass}? This will overwrite the current timetable.`)) {
+            return;
+        }
+
+        try {
+            const response = await fetchWithCSRF('/api/admin/schedule', {
+                method: 'PUT',
+                body: JSON.stringify({
+                    class: selectedClass,
+                    schedule: generatedSchedule
+                })
+            });
+
+            if (response.ok) {
+                alert('Schedule applied successfully!');
+                cancelPreview();
+                window.location.href = '/timetable-editor';
+            } else {
+                const error = await response.json();
+                alert('Failed to apply schedule: ' + (error.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Apply error:', error);
+            alert('Failed to apply schedule');
+        }
+    }
+
+    function cancelPreview() {
+        generatedSchedule = null;
+        selectedClass = null;
+        document.getElementById('schedulePreview').style.display = 'none';
+        document.getElementById('generationResults').style.display = 'none';
+        document.getElementById('targetClass').value = '';
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SchoolSync Pro{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #3b82f6;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --secondary: #64748b;
+            --dark: #1e293b;
+            --light: #f5f7fa;
+            --sidebar-width: 70px;
+            --sidebar-expanded: 250px;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--light);
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: var(--sidebar-width);
+            height: 100vh;
+            background: var(--dark);
+            transition: width 0.3s;
+            overflow-x: hidden;
+            z-index: 1000;
+        }
+
+        .sidebar:hover {
+            width: var(--sidebar-expanded);
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            white-space: nowrap;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .sidebar-header i {
+            color: var(--primary);
+            font-size: 28px;
+            min-width: 30px;
+        }
+
+        .sidebar-header h2 {
+            color: white;
+            font-size: 20px;
+        }
+
+        .sidebar-menu {
+            list-style: none;
+            padding: 20px 0;
+        }
+
+        .sidebar-menu li {
+            margin: 5px 0;
+        }
+
+        .sidebar-menu a {
+            display: flex;
+            align-items: center;
+            padding: 15px 20px;
+            color: #94a3b8;
+            text-decoration: none;
+            transition: all 0.3s;
+            white-space: nowrap;
+            gap: 15px;
+        }
+
+        .sidebar-menu a i {
+            font-size: 20px;
+            min-width: 30px;
+        }
+
+        .sidebar-menu a:hover,
+        .sidebar-menu a.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            padding: 30px;
+            min-height: 100vh;
+            transition: margin-left 0.3s;
+        }
+
+        .sidebar:hover ~ .main-content {
+            margin-left: var(--sidebar-expanded);
+        }
+
+        /* Top Bar */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: white;
+            padding: 20px 30px;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            cursor: pointer;
+            padding: 8px 15px;
+            border-radius: 10px;
+            transition: background 0.3s;
+        }
+
+        .user-info:hover {
+            background: var(--light);
+        }
+
+        .user-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: bold;
+            color: white;
+            background: linear-gradient(135deg, var(--primary), #8b5cf6);
+        }
+
+        .user-avatar img {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .user-details h3 {
+            font-size: 16px;
+            color: var(--dark);
+        }
+
+        .user-details p {
+            font-size: 13px;
+            color: var(--secondary);
+        }
+
+        .logout-btn {
+            background: var(--danger);
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logout-btn:hover {
+            background: #dc2626;
+            transform: translateY(-2px);
+        }
+
+        /* Cards */
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--light);
+        }
+
+        .card-header h2 {
+            color: var(--dark);
+            font-size: 24px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 12px 25px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2563eb;
+            transform: translateY(-2px);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: modalSlideIn 0.3s;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            padding: 25px;
+            border-bottom: 1px solid var(--light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            font-size: 22px;
+            color: var(--dark);
+        }
+
+        .close-modal {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: var(--secondary);
+            cursor: pointer;
+            width: 35px;
+            height: 35px;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .close-modal:hover {
+            background: var(--light);
+            color: var(--dark);
+        }
+
+        .modal-body {
+            padding: 25px;
+        }
+
+        /* Form Styles */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--dark);
+            font-weight: 500;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: var(--light);
+            position: sticky;
+            top: 0;
+        }
+
+        th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--dark);
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        tr:hover {
+            background: var(--light);
+        }
+
+        /* Utility Classes */
+        .text-center {
+            text-align: center;
+        }
+
+        .mt-20 {
+            margin-top: 20px;
+        }
+
+        .mb-20 {
+            margin-bottom: 20px;
+        }
+
+        .flex {
+            display: flex;
+        }
+
+        .gap-10 {
+            gap: 10px;
+        }
+
+        .items-center {
+            align-items: center;
+        }
+
+        .justify-between {
+            justify-content: space-between;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            border: 3px solid var(--light);
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Alert Banner */
+        .alert {
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .alert-info {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .alert-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .alert-danger {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <i class="fas fa-graduation-cap"></i>
+            <h2>SchoolSync</h2>
+        </div>
+        <ul class="sidebar-menu">
+            <li>
+                <a href="/account" class="{% if request.path == '/account' %}active{% endif %}">
+                    <i class="fas fa-user"></i>
+                    <span>Account</span>
+                </a>
+            </li>
+            <li>
+                <a href="/schedule" class="{% if request.path == '/schedule' %}active{% endif %}">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>Schedule</span>
+                </a>
+            </li>
+            {% if session.role == 'student' %}
+            <li>
+                <a href="/calendar" class="{% if request.path == '/calendar' %}active{% endif %}">
+                    <i class="fas fa-calendar-week"></i>
+                    <span>Calendar</span>
+                </a>
+            </li>
+            {% endif %}
+            <li>
+                <a href="/homework" class="{% if request.path == '/homework' %}active{% endif %}">
+                    <i class="fas fa-book"></i>
+                    <span>Homework</span>
+                </a>
+            </li>
+            <li>
+                <a href="/grades" class="{% if request.path == '/grades' %}active{% endif %}">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Grades</span>
+                </a>
+            </li>
+            <li>
+                <a href="/tasks" class="{% if request.path == '/tasks' %}active{% endif %}">
+                    <i class="fas fa-tasks"></i>
+                    <span>Tasks</span>
+                </a>
+            </li>
+            <li>
+                <a href="/chat" class="{% if request.path == '/chat' %}active{% endif %}">
+                    <i class="fas fa-comments"></i>
+                    <span>Chat</span>
+                </a>
+            </li>
+            {% if session.role in ['admin', 'superadmin'] %}
+            <li style="border-top: 1px solid rgba(255,255,255,0.1); margin-top: 10px; padding-top: 10px;">
+                <a href="/accounts-mgmt" class="{% if request.path == '/accounts-mgmt' %}active{% endif %}">
+                    <i class="fas fa-users-cog"></i>
+                    <span>Accounts</span>
+                </a>
+            </li>
+            <li>
+                <a href="/data-import" class="{% if request.path == '/data-import' %}active{% endif %}">
+                    <i class="fas fa-file-upload"></i>
+                    <span>Data Import</span>
+                </a>
+            </li>
+            <li>
+                <a href="/timetable-editor" class="{% if request.path == '/timetable-editor' %}active{% endif %}">
+                    <i class="fas fa-table"></i>
+                    <span>Timetable</span>
+                </a>
+            </li>
+            <li>
+                <a href="/experimental" class="{% if request.path == '/experimental' %}active{% endif %}">
+                    <i class="fas fa-flask"></i>
+                    <span>Experimental</span>
+                </a>
+            </li>
+            {% endif %}
+            {% if session.role == 'superadmin' %}
+            <li>
+                <a href="/monitor-chats" class="{% if request.path == '/monitor-chats' %}active{% endif %}">
+                    <i class="fas fa-eye"></i>
+                    <span>Monitor Chats</span>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <div>
+                <h1 style="font-size: 28px; color: var(--dark);">{% block page_title %}Dashboard{% endblock %}</h1>
+            </div>
+            <div style="display: flex; gap: 20px; align-items: center;">
+                <div class="user-info" onclick="openProfileModal()">
+                    <div class="user-avatar" id="topAvatar">
+                        {{ session.name[0] if session.name else 'U' }}
+                    </div>
+                    <div class="user-details">
+                        <h3 id="topUserName">{{ session.name }}</h3>
+                        <p>{{ session.role|capitalize }} • {{ session.user_id }}</p>
+                    </div>
+                </div>
+                <button class="logout-btn" onclick="window.location.href='/logout'">
+                    <i class="fas fa-sign-out-alt"></i>
+                    Logout
+                </button>
+            </div>
+        </div>
+
+        <!-- Page Content -->
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Profile Modal -->
+    <div class="modal" id="profileModal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h2>Profile Settings</h2>
+                <button class="close-modal" onclick="closeProfileModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Tabs -->
+                <div style="display: flex; gap: 10px; margin-bottom: 25px; border-bottom: 2px solid var(--light);">
+                    <button class="tab-btn active" onclick="switchTab('profile')">
+                        <i class="fas fa-user"></i> Profile
+                    </button>
+                    <button class="tab-btn" onclick="switchTab('security')">
+                        <i class="fas fa-lock"></i> Security
+                    </button>
+                </div>
+
+                <!-- Profile Tab -->
+                <div id="profileTab" class="tab-content active">
+                    <div style="text-align: center; margin-bottom: 30px;">
+                        <div class="user-avatar" id="modalAvatar" style="width: 120px; height: 120px; font-size: 48px; margin: 0 auto 20px;">
+                            {{ session.name[0] if session.name else 'U' }}
+                        </div>
+                        
+                        <!-- Avatar Options -->
+                        <div style="margin: 20px 0;">
+                            <h4 style="margin-bottom: 15px; color: var(--dark);">Change Avatar</h4>
+                            <input type="file" id="avatarUpload" accept="image/*" style="display: none;" onchange="handleAvatarUpload(event)">
+                            <button class="btn btn-primary" onclick="document.getElementById('avatarUpload').click()">
+                                <i class="fas fa-upload"></i> Upload Photo
+                            </button>
+                        </div>
+
+                        <!-- Preset Avatars -->
+                        <div style="margin-top: 20px;">
+                            <p style="margin-bottom: 10px; color: var(--secondary);">Or choose a preset:</p>
+                            <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                                <div class="preset-avatar" onclick="selectPresetAvatar('linear-gradient(135deg, #667eea 0%, #764ba2 100%)')" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>
+                                <div class="preset-avatar" onclick="selectPresetAvatar('linear-gradient(135deg, #f093fb 0%, #f5576c 100%)')" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);"></div>
+                                <div class="preset-avatar" onclick="selectPresetAvatar('linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)')" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);"></div>
+                                <div class="preset-avatar" onclick="selectPresetAvatar('linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)')" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);"></div>
+                                <div class="preset-avatar" onclick="selectPresetAvatar('linear-gradient(135deg, #fa709a 0%, #fee140 100%)')" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);"></div>
+                                <div class="preset-avatar" onclick="selectPresetAvatar('linear-gradient(135deg, #30cfd0 0%, #330867 100%)')" style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);"></div>
+                                <div class="preset-avatar" onclick="selectPresetAvatar('linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)')" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);"></div>
+                                <div class="preset-avatar" onclick="selectPresetAvatar('linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)')" style="background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);"></div>
+                                <div class="preset-avatar" onclick="selectPresetAvatar('linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)')" style="background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);"></div>
+                                <div class="preset-avatar" onclick="selectPresetAvatar('linear-gradient(135deg, #ff6e7f 0%, #bfe9ff 100%)')" style="background: linear-gradient(135deg, #ff6e7f 0%, #bfe9ff 100%);"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Name</label>
+                        <input type="text" class="form-control" id="profileName" value="{{ session.name }}">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" class="form-control" id="profileUsername" value="{{ session.username }}">
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div class="form-group">
+                            <label>User ID</label>
+                            <input type="text" class="form-control" value="{{ session.user_id }}" disabled>
+                        </div>
+                        <div class="form-group">
+                            <label>Role</label>
+                            <input type="text" class="form-control" value="{{ session.role|capitalize }}" disabled>
+                        </div>
+                    </div>
+
+                    {% if session.class_name %}
+                    <div class="form-group">
+                        <label>Class</label>
+                        <input type="text" class="form-control" value="{{ session.class_name }}" disabled>
+                    </div>
+                    {% endif %}
+
+                    <button class="btn btn-primary" style="width: 100%;" onclick="saveProfile()">
+                        <i class="fas fa-save"></i> Save Changes
+                    </button>
+                </div>
+
+                <!-- Security Tab -->
+                <div id="securityTab" class="tab-content">
+                    <h3 style="margin-bottom: 20px;">Change Password</h3>
+                    <form id="passwordForm" onsubmit="changePassword(event)">
+                        <div class="form-group">
+                            <label>Current Password</label>
+                            <input type="password" class="form-control" id="currentPassword" required>
+                        </div>
+                        <div class="form-group">
+                            <label>New Password</label>
+                            <input type="password" class="form-control" id="newPassword" required minlength="8">
+                            <small style="color: var(--secondary);">Minimum 8 characters</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Confirm New Password</label>
+                            <input type="password" class="form-control" id="confirmPassword" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="width: 100%;">
+                            <i class="fas fa-key"></i> Change Password
+                        </button>
+                    </form>
+                    <div class="alert alert-warning" style="margin-top: 20px;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        You will be logged out after changing your password.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 12px 20px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--secondary);
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .preset-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 3px solid transparent;
+        }
+
+        .preset-avatar:hover {
+            transform: scale(1.1);
+            border-color: var(--primary);
+        }
+    </style>
+
+    <script>
+        // CSRF Token Management
+        let csrfToken = '';
+
+        async function getCSRFToken() {
+            try {
+                const response = await fetch('/api/csrf-token');
+                const data = await response.json();
+                csrfToken = data.csrf_token;
+            } catch (error) {
+                console.error('Failed to get CSRF token:', error);
+            }
+        }
+
+        async function fetchWithCSRF(url, options = {}) {
+            if (!csrfToken) await getCSRFToken();
+            
+            options.headers = options.headers || {};
+            options.headers['X-CSRFToken'] = csrfToken;
+            options.headers['Content-Type'] = 'application/json';
+            
+            return fetch(url, options);
+        }
+
+        // Get CSRF token on page load
+        document.addEventListener('DOMContentLoaded', getCSRFToken);
+
+        // Profile Modal Functions
+        let currentAvatarType = 'initial';
+        let currentAvatarData = '{{ session.name[0] if session.name else "U" }}';
+
+        function openProfileModal() {
+            document.getElementById('profileModal').classList.add('active');
+            loadProfileData();
+        }
+
+        function closeProfileModal() {
+            document.getElementById('profileModal').classList.remove('active');
+        }
+
+        function switchTab(tabName) {
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            // Add active class to selected tab
+            event.target.classList.add('active');
+            document.getElementById(tabName + 'Tab').classList.add('active');
+        }
+
+        async function loadProfileData() {
+            try {
+                const response = await fetch('/api/account');
+                const data = await response.json();
+                
+                currentAvatarType = data.avatar_type;
+                currentAvatarData = data.avatar_data;
+                
+                updateAvatarDisplay();
+            } catch (error) {
+                console.error('Failed to load profile:', error);
+            }
+        }
+
+        function updateAvatarDisplay() {
+            const avatars = [document.getElementById('topAvatar'), document.getElementById('modalAvatar')];
+            
+            avatars.forEach(avatar => {
+                if (currentAvatarType === 'uploaded') {
+                    avatar.innerHTML = `<img src="${currentAvatarData}" alt="Avatar">`;
+                } else if (currentAvatarType === 'gradient') {
+                    avatar.style.background = currentAvatarData;
+                    avatar.textContent = '';
+                } else {
+                    avatar.style.background = 'linear-gradient(135deg, var(--primary), #8b5cf6)';
+                    avatar.textContent = currentAvatarData;
+                }
+            });
+        }
+
+        function handleAvatarUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            if (file.size > 2 * 1024 * 1024) {
+                alert('File size must be less than 2MB');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                currentAvatarType = 'uploaded';
+                currentAvatarData = e.target.result;
+                updateAvatarDisplay();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function selectPresetAvatar(gradient) {
+            currentAvatarType = 'gradient';
+            currentAvatarData = gradient;
+            updateAvatarDisplay();
+        }
+
+        async function saveProfile() {
+            const name = document.getElementById('profileName').value;
+            const username = document.getElementById('profileUsername').value;
+            
+            if (!name || !username) {
+                alert('Name and username are required');
+                return;
+            }
+            
+            try {
+                const response = await fetchWithCSRF('/api/profile', {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        name,
+                        username,
+                        avatar_type: currentAvatarType,
+                        avatar_data: currentAvatarData
+                    })
+                });
+                
+                if (response.ok) {
+                    alert('Profile updated successfully!');
+                    document.getElementById('topUserName').textContent = name;
+                    closeProfileModal();
+                    
+                    // Reload if username changed
+                    const oldUsername = '{{ session.username }}';
+                    if (username !== oldUsername) {
+                        window.location.reload();
+                    }
+                } else {
+                    const error = await response.json();
+                    alert(error.error || 'Failed to update profile');
+                }
+            } catch (error) {
+                console.error('Error updating profile:', error);
+                alert('Failed to update profile');
+            }
+        }
+
+        async function changePassword(event) {
+            event.preventDefault();
+            
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            
+            if (newPassword !== confirmPassword) {
+                alert('New passwords do not match');
+                return;
+            }
+            
+            try {
+                const response = await fetchWithCSRF('/api/change-password', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        currentPassword,
+                        newPassword
+                    })
+                });
+                
+                if (response.ok) {
+                    alert('Password changed successfully! You will now be logged out.');
+                    window.location.href = '/logout';
+                } else {
+                    const error = await response.json();
+                    alert(error.error || 'Failed to change password');
+                }
+            } catch (error) {
+                console.error('Error changing password:', error);
+                alert('Failed to change password');
+            }
+        }
+
+        // Close modal on outside click
+        window.onclick = function(event) {
+            const modal = document.getElementById('profileModal');
+            if (event.target === modal) {
+                closeProfileModal();
+            }
+        }
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
